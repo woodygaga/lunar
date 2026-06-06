@@ -1,0 +1,1016 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>LUNAR · 基地 BASE</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; background:#0a1018; color:#e8eaf0; font-family:'Segoe UI','PingFang SC',sans-serif; letter-spacing:0.03em; user-select:none; -webkit-user-select:none; }
+
+/* ── 全屏 flex 布局 ── */
+#app { display:flex; flex-direction:column; height:100%; }
+
+/* ── Header ── */
+#header {
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding:14px 24px 10px;
+  border-bottom:1px solid rgba(140,180,240,0.2);
+  flex-shrink:0;
+}
+#header h1 { font-weight:100; font-size:24px; letter-spacing:0.3em; text-shadow:0 0 20px rgba(140,180,240,0.3); }
+#header h1 .sub { font-size:11px; opacity:0.45; margin-left:10px; letter-spacing:0.4em; }
+#exit-btn {
+  background:rgba(140,180,240,0.10); border:1px solid rgba(140,180,240,0.5);
+  color:rgba(220,235,255,0.95); padding:7px 16px; font-family:inherit; font-size:11px;
+  letter-spacing:0.2em; cursor:pointer; border-radius:3px; transition:all 0.2s;
+}
+#exit-btn:hover { background:rgba(140,180,240,0.22); }
+
+/* ── 页面指示器 ── */
+#page-dots {
+  display:flex; gap:8px; align-items:center;
+}
+.dot {
+  width:6px; height:6px; border-radius:50%;
+  background:rgba(255,255,255,0.2); transition:all 0.3s;
+}
+.dot.active { background:rgba(180,210,255,0.9); box-shadow:0 0 6px rgba(140,180,240,0.5); }
+
+/* ── 翻页区 ── */
+#carousel {
+  flex:1; position:relative; overflow:hidden;
+}
+#track {
+  display:flex; height:100%;
+  transition:transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+#track.dragging { transition:none; }
+.page {
+  min-width:100%; height:100%; overflow-y:auto;
+  padding:8px 12px;
+  pointer-events:none;               /* 默认禁用，只有当前激活页可交互（防非当前页吞事件） */
+}
+.page.page-active { pointer-events:auto; }
+
+/* ── 翻页三角 ── */
+.arrow {
+  position:absolute; top:50%; transform:translateY(-50%);
+  width:36px; height:60px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; z-index:20; opacity:0.3; transition:opacity 0.2s;
+  background:rgba(0,0,0,0.3); border:none;
+}
+.arrow:hover { opacity:0.8; }
+.arrow::after {
+  content:''; display:block;
+  width:10px; height:10px;
+  border-top:2px solid rgba(255,255,255,0.8);
+  border-right:2px solid rgba(255,255,255,0.8);
+}
+#arrow-left  { left:0;  border-radius:0 4px 4px 0; }
+#arrow-right { right:0; border-radius:4px 0 0 4px; }
+#arrow-left::after  { transform:rotate(-135deg); margin-left:3px; }
+#arrow-right::after { transform:rotate(45deg);   margin-right:3px; }
+
+/* ── Footer 日志 ── */
+#footer {
+  flex-shrink:0; border-top:1px solid rgba(255,255,255,0.06);
+  padding:8px 20px; font-size:10px; letter-spacing:0.05em;
+  color:rgba(255,255,255,0.3);
+  min-height:48px; max-height:107px; overflow-y:auto;
+}
+#footer .log-line { line-height:1.8; }
+#footer .log-warn { color:rgba(255,200,120,0.8); }
+#footer .log-good { color:rgba(140,220,180,0.8); }
+#footer .log-bad  { color:rgba(255,120,100,0.8); }
+
+/* ══════════════════════════════════════════════════════════════════
+   页面 0：仪表盘
+   ══════════════════════════════════════════════════════════════════ */
+.res-row {
+  display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;
+}
+.res-tag {
+  padding:8px 14px; background:rgba(255,255,255,0.035);
+  border:1px solid rgba(255,255,255,0.08); border-radius:4px;
+  min-width:100px;
+}
+.res-tag .rt-name { font-size:9px; letter-spacing:0.2em; color:rgba(180,220,255,0.5); margin-bottom:2px; }
+.res-tag .rt-val  { font-size:20px; font-weight:100; }
+.res-tag .rt-unit { font-size:10px; opacity:0.45; margin-left:2px; }
+.res-tag.warn  .rt-val { color:#f0c060; }
+.res-tag.danger .rt-val { color:#f06050; }
+
+.rooms-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:10px;
+}
+.room-card {
+  background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.08);
+  border-radius:4px; padding:12px 14px;
+}
+.room-card h3 {
+  font-size:10px; letter-spacing:0.2em; color:rgba(180,220,255,0.45); font-weight:400;
+  margin-bottom:8px;
+}
+.room-tag {
+  display:inline-block; font-size:8px; padding:1px 5px; margin-left:6px; border-radius:2px;
+  letter-spacing:0.1em; vertical-align:middle;
+}
+.tag-hot  { background:rgba(220,100,60,0.2);  border:1px solid rgba(220,100,60,0.4);  color:rgba(255,180,140,0.9); }
+.tag-norm { background:rgba(80,160,220,0.2);  border:1px solid rgba(80,160,220,0.4);  color:rgba(160,210,255,0.9); }
+.tag-bld  { background:rgba(140,200,100,0.2);  border:1px solid rgba(140,200,100,0.4);  color:rgba(180,230,150,0.9); }
+.tag-cult { background:rgba(180,120,220,0.2);  border:1px solid rgba(180,120,220,0.4);  color:rgba(210,170,240,0.9); }
+
+.slot-mini {
+  display:flex; align-items:center; gap:8px; padding:6px 8px; margin-bottom:4px;
+  border-radius:3px; font-size:11px;
+}
+.slot-mini.empty  { color:rgba(255,255,255,0.2); border:1px dashed rgba(255,255,255,0.08); }
+.slot-mini.filled { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); }
+.slot-mini .sm-icon { font-size:16px; width:20px; text-align:center; flex-shrink:0; }
+.slot-mini .sm-info { flex:1; min-width:0; }
+.slot-mini .sm-name { font-size:11px; }
+.slot-mini .sm-rate { font-size:9px; color:rgba(255,255,255,0.35); }
+.slot-mini .sm-actions { display:flex; gap:4px; }
+.slot-mini .sm-actions button {
+  padding:3px 8px; font-family:inherit; font-size:9px; letter-spacing:0.05em;
+  border-radius:2px; cursor:pointer; border:1px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.6);
+}
+.slot-mini .sm-actions .sm-off { color:rgba(255,160,100,0.8); border-color:rgba(255,160,100,0.35); }
+
+/* ── 补给按钮行 ── */
+.supply-row { display:flex; gap:8px; margin-top:12px; }
+.supply-btn {
+  padding:8px 14px; font-family:inherit; font-size:11px; letter-spacing:0.05em;
+  border-radius:3px; cursor:pointer;
+  background:rgba(140,180,240,0.08); border:1px solid rgba(140,180,240,0.35); color:rgba(220,235,255,0.9);
+}
+.supply-btn:disabled { opacity:0.3; cursor:not-allowed; }
+.supply-btn .cost { font-size:9px; opacity:0.5; margin-left:5px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   页面 1：远程操控
+   ══════════════════════════════════════════════════════════════════ */
+.cam-layout { display:flex; flex-direction:column; height:100%; gap:6px; }
+.cam-top { display:flex; gap:6px; flex:1; min-height:0; }
+.cam-view {
+  width:66%; flex-shrink:0; background:#000; border:1px solid rgba(255,255,255,0.1); border-radius:4px;
+  overflow:hidden; position:relative;
+}
+.cam-view iframe {
+  width:100%; height:100%; border:none;
+  /* pointer-events 开放，让右键拖拽传到 iframe 内的 Three.js */
+}
+.cam-view .cam-label {
+  position:absolute; top:4px; left:8px; font-size:8px; letter-spacing:0.12em;
+  color:rgba(255,255,255,0.3); pointer-events:none; z-index:1;
+}
+.cam-minimap {
+  flex:1; min-width:0;
+  background:rgba(0,0,0,0.4);
+  border-radius:4px; display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
+}
+.cam-minimap canvas { display:block; width:100%; height:100%; }
+
+/* 底部状态 + 控制 — 5倍高度 */
+.cam-bottom { display:flex; gap:8px; flex-shrink:0; min-height:120px; }
+.cam-status {
+  flex:1; display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; align-content:flex-start;
+  padding:10px 14px; background:rgba(255,255,255,0.025);
+  border:1px solid rgba(255,255,255,0.07); border-radius:4px;
+}
+.cam-stat { min-width:65px; }
+.cam-stat .cs-name { font-size:8px; letter-spacing:0.15em; color:rgba(180,220,255,0.45); }
+.cam-stat .cs-val  { font-size:18px; font-weight:100; margin-top:2px; }
+.cam-stat .cs-unit { font-size:9px; opacity:0.4; }
+
+.cam-ctrl {
+  display:flex; gap:6px; align-items:center;
+  padding:10px 14px; background:rgba(255,255,255,0.025);
+  border:1px solid rgba(255,255,255,0.07); border-radius:4px;
+}
+.cam-ctrl .ctrl-btn {
+  width:40px; height:40px; display:flex; align-items:center; justify-content:center;
+  font-family:inherit; font-size:18px; cursor:pointer; border-radius:3px;
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.5);
+  transition:all 0.15s;
+}
+.cam-ctrl .ctrl-btn:hover { background:rgba(255,255,255,0.14); color:#fff; }
+.cam-ctrl .ctrl-btn.ctrl-stop {
+  width:auto; padding:0 16px; font-size:11px; letter-spacing:0.1em;
+  color:rgba(255,160,100,0.8); border-color:rgba(255,160,100,0.4);
+}
+.cam-ctrl .ctrl-btn.ctrl-recall {
+  width:auto; padding:0 16px; font-size:11px; letter-spacing:0.08em;
+  color:rgba(140,200,240,0.8); border-color:rgba(140,200,240,0.4);
+}
+#autoCollectBtn {
+  width:auto; padding:0 16px; font-size:11px; letter-spacing:0.08em;
+  color:rgba(150,220,180,0.85); border-color:rgba(150,220,180,0.4);
+}
+#autoCollectBtn.auto-on {
+  background:rgba(150,220,180,0.22); color:rgba(200,255,220,0.95);
+  border-color:rgba(150,220,180,0.7);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   页面 2：设备商店
+   ══════════════════════════════════════════════════════════════════ */
+.shop-list { display:flex; flex-direction:column; gap:6px; }
+.shop-item {
+  display:flex; align-items:center; gap:10px; padding:10px 14px;
+  background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06);
+  border-radius:4px;
+}
+/* 取消 shop-item 悬停闪烁；按钮自己的 hover 保留 */
+.shop-item .si-icon { font-size:20px; width:26px; text-align:center; flex-shrink:0; }
+.shop-item .si-info { flex:1; min-width:0; }
+.shop-item .si-name { font-size:12px; }
+.shop-item .si-desc { font-size:9px; color:rgba(255,255,255,0.35); margin-top:1px; }
+.shop-item .si-cost { font-size:10px; color:rgba(200,160,100,0.7); margin-top:2px; }
+.shop-item .si-cost .ok { color:rgba(140,220,140,0.8); }
+.shop-item .si-cost .nok { color:rgba(220,100,80,0.7); text-decoration:line-through; }
+.shop-item .si-btn {
+  padding:5px 12px; font-family:inherit; font-size:10px; letter-spacing:0.05em;
+  border-radius:3px; cursor:pointer; flex-shrink:0;
+  background:rgba(140,180,240,0.10); border:1px solid rgba(140,180,240,0.35); color:rgba(220,235,255,0.85);
+  transition:all 0.15s;
+}
+.shop-item .si-btn:hover { background:rgba(140,180,240,0.25); }
+.shop-item .si-btn:disabled { opacity:0.3; cursor:not-allowed; }
+
+/* ── Toast ── */
+#toast {
+  position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+  padding:8px 18px; background:rgba(0,0,0,0.85);
+  border:1px solid rgba(140,180,240,0.5); border-radius:3px;
+  font-size:12px; letter-spacing:0.1em; color:rgba(180,220,255,0.95);
+  opacity:0; transition:opacity 0.3s; pointer-events:none; z-index:100;
+}
+#toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Header -->
+  <div id="header">
+    <h1>基地 <span class="sub">BASE · 一号站</span></h1>
+    <div id="page-dots"></div>
+    <button id="exit-btn">出基地 → 上车 (ESC)</button>
+  </div>
+
+  <!-- 翻页区 -->
+  <div id="carousel">
+    <div id="track">
+      <!-- 页 0：仪表盘 —— JS 动态填充 -->
+      <div class="page" id="page-dash"></div>
+      <!-- 页 1：基地车画面 -->
+      <div class="page" id="page-cam"></div>
+      <!-- 页 2：仓库 / 载重 -->
+      <div class="page" id="page-wh"></div>
+      <!-- 页 3：设备商店 -->
+      <div class="page" id="page-shop"></div>
+    </div>
+    <button class="arrow" id="arrow-left" title="上一页"></button>
+    <button class="arrow" id="arrow-right" title="下一页"></button>
+  </div>
+
+  <!-- Footer 日志 -->
+  <div id="footer"><span style="opacity:0.25">— 基地系统已启动 —</span></div>
+</div>
+
+<div id="toast"></div>
+
+<script src="storage.js?v=b13"></script>
+<script src="inventory.js?v=b13"></script>
+<script>
+// ══════════════════════════════════════════════════════════════════════
+//  数据定义（同之前）
+// ══════════════════════════════════════════════════════════════════════
+
+const ROOMS = [
+  { id:'hot',  name:'高温作业室', tag:'高温', tagClass:'tag-hot',  slots:2 },
+  { id:'norm', name:'常温作业室', tag:'常温', tagClass:'tag-norm', slots:2 },
+  { id:'bld',  name:'建造室',     tag:'建造', tagClass:'tag-bld',  slots:2 },
+  { id:'cult', name:'培养室',     tag:'培养', tagClass:'tag-cult', slots:2 },
+];
+
+const O2_SCALE = 1 / 6000;  // %/min → fraction/sec
+
+const DEVICES = [
+  { id:'melt_extractor',     name:'熔融萃取炉',   icon:'🔥', room:'hot',  cost:{soil:200},        consumes:{soil:0.5, power:10},  produces:{oxygen:1.5*O2_SCALE},                       desc:'月壤熔融电解制氧' },
+  { id:'solid_electrolyzer', name:'熔盐解离仪',   icon:'⚡', room:'hot',  cost:{soil:500},        consumes:{soil:1.0, power:25},  produces:{oxygen:1.0*O2_SCALE, si_al_alloy:0.02, titanium_waste:0.01}, desc:'固态电解·副产硅铝+钛废料' },
+  { id:'ice_electrolyzer',   name:'电解器-冰',    icon:'🧊', room:'norm', cost:{soil:200, ice:100}, consumes:{ice:0.3, power:15},   produces:{oxygen:2.0*O2_SCALE, hydrogen:0.05},        desc:'月冰水解·副产氢气' },
+  { id:'gas_compressor',     name:'气体压缩机',   icon:'💨', room:'norm', cost:{soil:300},        consumes:{power:5},             produces:{},                                          desc:'必备—气态氧→可携带O₂瓶' },
+  { id:'artificial_photo',   name:'人工光合反应器',icon:'☀️', room:'norm', cost:{soil:300, ice:200}, consumes:{ice:0.2, power:12},   produces:{oxygen:2.5*O2_SCALE, methane:0.03},          desc:'人工光合·副产甲烷' },
+  { id:'refinery',           name:'精炼炉',       icon:'🔩', room:'bld',  cost:{soil:400},        consumes:{titanium_waste:0.02, power:20}, produces:{titanium:0.015},                    desc:'钛废料→钛合金' },
+  { id:'printer3d',          name:'3D打印机',     icon:'🖨️', room:'bld',  cost:{soil:350, si_al_alloy:20}, consumes:{si_al_alloy:0.01, power:8}, produces:{},                             desc:'硅铝合金→零件', prereq:'solid_electrolyzer' },
+  { id:'purifier',           name:'净化系统',     icon:'💧', room:'cult', cost:{soil:150},        consumes:{power:3},             produces:{water:0.05},                                desc:'尿液净化→回收水' },
+  { id:'lettuce',            name:'生菜种子',     icon:'🥬', room:'cult', cost:{soil:100, water:10}, consumes:{water:0.02, power:2},  produces:{food:0.006},                                desc:'光合产食物+微量O₂' },
+  { id:'algae',              name:'小圆藻',       icon:'🟢', room:'cult', cost:{soil:150, water:5},  consumes:{water:0.03, power:3},  produces:{oxygen:1.2*O2_SCALE, food:0.003},           desc:'藻类·制氧+食物双产出' },
+];
+
+const SUPPLIES = [
+  { id:'buy_o2_tank', name:'网购O₂罐', icon:'📦', cost:{soil:50}, desc:'+25% O₂', action:'buyTank' },
+  { id:'fill_rover',  name:'填充车瓶', icon:'🚗', desc:'基地O₂→车瓶', action:'fillRover', need:'gas_compressor' },
+];
+
+const RESOURCE_META = {
+  oxygen:         { name:'O₂',    unit:'%',  icon:'🫧', max:1 },
+  soil:           { name:'月壤',  unit:'kg', icon:'🪨', max:Infinity },
+  ice:            { name:'月冰',  unit:'kg', icon:'🧊', max:Infinity },
+  power:          { name:'电力',  unit:'kW', icon:'⚡', max:100 },
+  water:          { name:'水',    unit:'L',  icon:'💧', max:Infinity },
+  food:           { name:'食物',  unit:'份', icon:'🍞', max:Infinity },
+  titanium:       { name:'钛合金',unit:'kg', icon:'🔩', max:Infinity },
+  o2_tank:        { name:'O₂瓶',  unit:'个', icon:'🫧', max:Infinity },
+};
+const RES_ORDER = ['oxygen','soil','ice','power','water','food','titanium','o2_tank'];
+
+// ══════════════════════════════════════════════════════════════════════
+//  游戏状态
+// ══════════════════════════════════════════════════════════════════════
+
+const DEFAULT_STATE = {
+  resources: { oxygen:0.85, soil:0, ice:0, power:100, water:20, food:5, titanium:0, titanium_waste:0, si_al_alloy:0, hydrogen:0, methane:0, o2_tank:1 },
+  installed: { hot:[null,null], norm:[null,null], bld:[null,null], cult:[null,null] },
+  activeDevices: {},
+  log: [],
+  builtOnce: {},
+};
+
+let S = loadState();
+
+// 没选存档 → 回登录页
+if (!SaveSys.getActivePlayer() || !SaveSys.getActiveSlot()) {
+  location.href = 'index.html';
+}
+
+function loadState() {
+  try {
+    const save = SaveSys.getCurrent();           // 当前激活存档
+    const p = save && save.base ? save.base : null;
+    if (p) {
+      const s = { ...DEFAULT_STATE, ...p };
+      s.resources = { ...DEFAULT_STATE.resources, ...(p.resources||{}) };
+      s.installed = { ...DEFAULT_STATE.installed, ...(p.installed||{}) };
+      for (const r of ROOMS) if (!s.installed[r.id]) s.installed[r.id] = [null,null];
+      s.activeDevices = s.activeDevices || {};
+      s.log = s.log || [];
+      s.builtOnce = s.builtOnce || {};
+      return s;
+    }
+  } catch(e) { console.warn('loadState failed', e); }
+  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+
+function saveState() {
+  SaveSys.patchCurrent(save => {
+    save.base = {
+      resources: S.resources, installed: S.installed, activeDevices: S.activeDevices,
+      log: S.log.slice(-50), builtOnce: S.builtOnce,
+    };
+    save.meta.lastPlayed = Date.now();
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  日志
+// ══════════════════════════════════════════════════════════════════════
+
+function addLog(msg, cls) {
+  const time = new Date().toLocaleTimeString('zh-CN', { hour12:false, hour:'2-digit', minute:'2-digit' });
+  S.log.unshift({ time, msg, cls });
+  if (S.log.length > 50) S.log.length = 50;
+  renderLog();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Tick
+// ══════════════════════════════════════════════════════════════════════
+
+const O2_CONSUMPTION = 1.5 * O2_SCALE;
+
+function tick(dt) {
+  S.resources.oxygen -= O2_CONSUMPTION * dt;
+  if (S.resources.oxygen < 0) S.resources.oxygen = 0;
+
+  for (const room of ROOMS) {
+    const slots = S.installed[room.id];
+    for (let si = 0; si < slots.length; si++) {
+      const devId = slots[si];
+      if (!devId) continue;
+      const key = room.id + ':' + si;
+      if (!S.activeDevices[key]) continue;
+      const dev = DEVICES.find(d => d.id === devId);
+      if (!dev) continue;
+
+      const canRun = Object.entries(dev.consumes || {}).every(([res, rate]) =>
+        (S.resources[res] || 0) >= rate * dt
+      );
+      if (!canRun) { S.activeDevices[key] = false; continue; }
+
+      for (const [res, rate] of Object.entries(dev.consumes || {}))
+        S.resources[res] = Math.max(0, (S.resources[res] || 0) - rate * dt);
+      for (const [res, rate] of Object.entries(dev.produces || {}))
+        S.resources[res] = (S.resources[res] || 0) + rate * dt;
+    }
+  }
+
+  if (S.resources.oxygen > 1) S.resources.oxygen = 1;
+
+  let powerUsed = 0;
+  for (const room of ROOMS) {
+    const slots = S.installed[room.id];
+    for (let si = 0; si < slots.length; si++) {
+      const devId = slots[si];
+      if (!devId) continue;
+      const key = room.id + ':' + si;
+      if (!S.activeDevices[key]) continue;
+      const dev = DEVICES.find(d => d.id === devId);
+      if (dev?.consumes?.power) powerUsed += dev.consumes.power;
+    }
+  }
+  S.resources.power = Math.max(0, 100 - powerUsed);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  操作
+// ══════════════════════════════════════════════════════════════════════
+
+function canAfford(cost) { return Object.entries(cost).every(([r,a]) => (S.resources[r]||0) >= a); }
+function payCost(cost) { for (const [r,a] of Object.entries(cost)) S.resources[r] = (S.resources[r]||0) - a; }
+
+function getEmptySlot(roomId) {
+  const slots = S.installed[roomId];
+  for (let i = 0; i < slots.length; i++) if (!slots[i]) return i;
+  return -1;
+}
+
+function installDevice(devId) {
+  const dev = DEVICES.find(d => d.id === devId);
+  if (!dev) return;
+  if (dev.prereq) {
+    let ok = false;
+    for (const r of ROOMS) for (let i=0; i<S.installed[r.id].length; i++)
+      if (S.installed[r.id][i] === dev.prereq) { ok = true; break; }
+    if (!ok) { showToast('需先安装前置设备'); return; }
+  }
+  const si = getEmptySlot(dev.room);
+  if (si < 0) { showToast('房间已满'); return; }
+  if (!canAfford(dev.cost)) { showToast('资源不足'); return; }
+  payCost(dev.cost);
+  S.installed[dev.room][si] = devId;
+  S.builtOnce[devId] = true;
+  addLog(`安装「${dev.name}」`, 'log-good');
+  saveState(); renderAll();
+}
+
+function uninstallDevice(roomId, si) {
+  const devId = S.installed[roomId][si];
+  if (!devId) return;
+  const dev = DEVICES.find(d => d.id === devId);
+  delete S.activeDevices[roomId+':'+si];
+  S.installed[roomId][si] = null;
+  addLog(`拆除「${dev?.name||devId}」`, 'log-bad');
+  saveState(); renderAll();
+}
+
+function toggleDevice(roomId, si) {
+  const devId = S.installed[roomId][si];
+  if (!devId) return;
+  const key = roomId + ':' + si;
+  const dev = DEVICES.find(d => d.id === devId);
+  if (S.activeDevices[key]) {
+    S.activeDevices[key] = false;
+    addLog(`关闭「${dev?.name||devId}」`);
+  } else {
+    S.activeDevices[key] = true;
+    addLog(`启动「${dev?.name||devId}」`, 'log-good');
+  }
+  saveState(); renderAll();
+}
+
+function buyO2Tank() {
+  if (!canAfford({soil:50})) { showToast('月壤不足'); return; }
+  payCost({soil:50});
+  S.resources.o2_tank = (S.resources.o2_tank||0) + 1;
+  S.resources.oxygen = Math.min(1, S.resources.oxygen + 0.25);
+  addLog('网购O₂罐 ×1', 'log-good');
+  saveState(); renderAll();
+}
+
+function fillRover() {
+  let ok = false;
+  for (let si=0; si<S.installed['norm'].length; si++)
+    if (S.installed['norm'][si]==='gas_compressor' && S.activeDevices['norm:'+si]) { ok=true; break; }
+  if (!ok) { showToast('需气体压缩机运行中'); return; }
+  if (S.resources.oxygen < 0.1) { showToast('基地O₂不足'); return; }
+  S.resources.oxygen -= 0.1;
+  S.resources.o2_tank = (S.resources.o2_tank||0) + 1;
+  addLog('填充车瓶 ×1', 'log-good');
+  saveState(); renderAll();
+}
+
+function handleSupply(id) {
+  if (id==='buyO2_tank') buyO2Tank();
+  else if (id==='fillRover') fillRover();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Toast
+// ══════════════════════════════════════════════════════════════════════
+
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function renderDash() {
+  const el = document.getElementById('page-dash');
+
+  // 资源行
+  let resHtml = '<div class="res-row">';
+  for (const key of RES_ORDER) {
+    const val = S.resources[key]||0;
+    const meta = RESOURCE_META[key];
+    if (!meta) continue;
+    let cls = '';
+    if (key==='oxygen') { if (val<0.2) cls='danger'; else if (val<0.4) cls='warn'; }
+    const d = key==='oxygen' ? (val*100).toFixed(0) : (val>=1000 ? (val/1000).toFixed(1)+'k' : Math.floor(val));
+    resHtml += `<div class="res-tag ${cls}"><div class="rt-name">${meta.icon} ${meta.name}</div><div class="rt-val">${d}<span class="rt-unit">${meta.unit}</span></div></div>`;
+  }
+  resHtml += '</div>';
+
+  // 房间 + 槽位
+  let roomHtml = '<div class="rooms-grid">';
+  for (const room of ROOMS) {
+    roomHtml += `<div class="room-card"><h3>${room.name}<span class="room-tag ${room.tagClass}">${room.tag}</span></h3>`;
+    const slots = S.installed[room.id];
+    for (let si=0; si<slots.length; si++) {
+      const devId = slots[si];
+      const key = room.id+':'+si;
+      const active = !!S.activeDevices[key];
+      if (devId) {
+        const dev = DEVICES.find(d=>d.id===devId);
+        if (!dev) { roomHtml += '<div class="slot-mini empty">—</div>'; continue; }
+        roomHtml += `<div class="slot-mini filled">`
+          + `<div class="sm-icon">${dev.icon}</div>`
+          + `<div class="sm-info"><div class="sm-name">${dev.name} ${active?'<span style="color:rgba(140,220,180,0.7);font-size:9px;">●</span>':'<span style="color:rgba(255,255,255,0.2);font-size:9px;">○</span>'}</div>`;
+        if (dev.consumes) for (const [r,rt] of Object.entries(dev.consumes))
+          roomHtml += `<span class="sm-rate" style="color:rgba(200,130,100,0.7)">-${rt}${RESOURCE_META[r]?.unit||''}/s</span> `;
+        if (dev.produces) for (const [r,rt] of Object.entries(dev.produces))
+          roomHtml += `<span class="sm-rate" style="color:rgba(130,200,130,0.7)">+${r==='oxygen'?(rt*60*100).toFixed(1)+'%/min':rt+(RESOURCE_META[r]?.unit||'')+'/s'}</span> `;
+        roomHtml += `</div>`
+          + `<div class="sm-actions">${active
+              ?`<button class="sm-off" onclick="toggleDevice('${room.id}',${si})">关</button>`
+              :`<button onclick="toggleDevice('${room.id}',${si})">开</button>`}
+             <button onclick="uninstallDevice('${room.id}',${si})" style="font-size:8px;" title="拆">✕</button></div>`
+          + `</div>`;
+      } else {
+        roomHtml += '<div class="slot-mini empty">空槽位</div>';
+      }
+    }
+    roomHtml += '</div>';
+  }
+  roomHtml += '</div>';
+
+  // 补给
+  let supHtml = '<div class="supply-row">';
+  for (const sup of SUPPLIES) {
+    let dis = false, hint = '';
+    if (sup.need==='gas_compressor') {
+      let ok = false;
+      for (let si=0; si<S.installed['norm'].length; si++)
+        if (S.installed['norm'][si]==='gas_compressor' && S.activeDevices['norm:'+si]) { ok=true; break; }
+      if (!ok) { dis=true; hint=' (需压缩机)'; }
+    }
+    let costStr = '';
+    if (sup.cost) for (const [r,a] of Object.entries(sup.cost)) costStr += `<span class="cost">${RESOURCE_META[r]?.icon||''}${a}${RESOURCE_META[r]?.unit||''}</span>`;
+    supHtml += `<button class="supply-btn" onclick="handleSupply('${sup.id}')" ${dis?'disabled':''}>${sup.icon||''} ${sup.name}${costStr}${hint}</button>`;
+  }
+  supHtml += '</div>';
+
+  el.innerHTML = resHtml + roomHtml + supHtml;
+}
+
+function renderCam() {
+  const rover = {
+    posX: 0, posZ: 0, speed: 0, heading: 0,
+    soil: Math.floor(S.resources.soil||0),
+    ice: Math.floor(S.resources.ice||0),
+    oxygen: '--',
+  };
+  document.getElementById('page-cam').innerHTML = `
+    <div class="cam-layout">
+      <div class="cam-top">
+        <div class="cam-view">
+          <div class="cam-label">◉ LIVE · 月球车视角</div>
+          <iframe src="outside_new.html?embed" allow="xr-spatial-tracking"></iframe>
+          <canvas id="snowCanvas" style="position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none"></canvas>
+          <div id="snowLabel" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3;font-family:'Segoe UI',sans-serif;font-size:11px;letter-spacing:0.4em;color:rgba(255,255,255,0.5);text-shadow:0 0 8px rgba(0,0,0,0.8);pointer-events:none">NO SIGNAL</div>
+        </div>
+        <div class="cam-minimap">
+          <iframe id="rect-minimap-frame" src="lunar-map.html?v=6" style="width:100%;height:100%;border:none;"></iframe>
+        </div>
+      </div>
+      <div class="cam-bottom">
+        <div class="cam-status">
+          <div class="cam-stat"><div class="cs-name">SPEED</div><div class="cs-val">${rover.speed}<span class="cs-unit"> km/h</span></div></div>
+          <div class="cam-stat"><div class="cs-name">HDG</div><div class="cs-val">--<span class="cs-unit">°</span></div></div>
+          <div class="cam-stat"><div class="cs-name">POS</div><div class="cs-val">--</div></div>
+          <div class="cam-stat"><div class="cs-name">O₂</div><div class="cs-val" style="color:#8cf">--<span class="cs-unit">%</span></div></div>
+          <div class="cam-stat"><div class="cs-name">SOIL</div><div class="cs-val">${rover.soil>=1000?(rover.soil/1000).toFixed(1)+'k':rover.soil}<span class="cs-unit"> kg</span></div></div>
+          <div class="cam-stat"><div class="cs-name">ICE</div><div class="cs-val">${rover.ice>=1000?(rover.ice/1000).toFixed(1)+'k':rover.ice}<span class="cs-unit"> kg</span></div></div>
+        </div>
+        <div class="cam-ctrl">
+          <button class="ctrl-btn" title="左转">↺</button>
+          <button class="ctrl-btn" title="前进">↑</button>
+          <button class="ctrl-btn" title="右转">↻</button>
+          <div style="width:1px;height:24px;background:rgba(255,255,255,0.1);margin:0 4px"></div>
+          <button class="ctrl-btn ctrl-stop">■ STOP</button>
+          <button class="ctrl-btn ctrl-recall">⇤ RTH</button>
+          <button class="ctrl-btn" id="autoCollectBtn">⛏ 自动采集</button>
+        </div>
+      </div>
+    </div>`;
+
+  // 自动采集按钮 → 切换 outside 自动模式
+  const acb = document.getElementById('autoCollectBtn');
+  if (acb) {
+    acb.classList.toggle('auto-on', _autoCollectOn);
+    acb.textContent = _autoCollectOn ? '⏹ 停止采集' : '⛏ 自动采集';
+    acb.addEventListener('click', () => {
+      _autoCollectOn = !_autoCollectOn;
+      acb.classList.toggle('auto-on', _autoCollectOn);
+      acb.textContent = _autoCollectOn ? '⏹ 停止采集' : '⛏ 自动采集';
+      // IFRAME-COMM: base→outside 切换自动采集模式（带已发现月壤点供导航）
+      const cf = document.querySelector('.cam-view iframe');
+      const disc = SaveSys.get('discoveredRocks') || {};
+      if (cf && cf.contentWindow) cf.contentWindow.postMessage({type:'setAutoCollect', on:_autoCollectOn, rocks:disc}, '*');
+    });
+  }
+
+  // 渲染完 → 启动雪花屏；地形 ready 后会自动隐藏
+  if (!_liveReady) startSnow();
+}
+
+function renderShop() {
+  let html = '<div class="shop-list">';
+  for (const dev of DEVICES) {
+    const installed = Object.values(S.installed).flat().includes(dev.id);
+    const canBuy = canAfford(dev.cost);
+    const full = getEmptySlot(dev.room) < 0;
+    const dis = installed || !canBuy || full;
+    let hint = installed ? '已安装' : (full ? '无空位' : (canBuy ? '' : '资源不足'));
+    let costHtml = '';
+    for (const [r,a] of Object.entries(dev.cost)) {
+      const ok = (S.resources[r]||0) >= a;
+      costHtml += `<span class="${ok?'ok':'nok'}">${RESOURCE_META[r]?.icon||''} ${a}${RESOURCE_META[r]?.unit||r}</span> `;
+    }
+    html += `<div class="shop-item">`
+      + `<div class="si-icon">${dev.icon}</div>`
+      + `<div class="si-info"><div class="si-name">${dev.name}</div><div class="si-desc">${dev.desc}</div><div class="si-cost">${costHtml}</div></div>`
+      + `<button class="si-btn" onclick="installDevice('${dev.id}')" ${dis?'disabled':''}>${hint||'安装'}</button>`
+      + `</div>`;
+  }
+  html += '</div>';
+  document.getElementById('page-shop').innerHTML = html;
+}
+
+function renderLog() {
+  const el = document.getElementById('footer');
+  if (S.log.length===0) { el.innerHTML = '<span style="opacity:0.25">— 无事件 —</span>'; return; }
+  el.innerHTML = S.log.slice(0,20).map(l =>
+    `<div class="log-line ${l.cls||''}">${l.time} · ${l.msg}</div>`
+  ).join('');
+}
+
+let _camRendered = false;
+function renderAll() {
+  // 只渲染当前可见页，避免 iframe 被反复销毁重建
+  if (curPage === 0) renderDash();
+  if (curPage === 1 && !_camRendered) { renderCam(); _camRendered = true; }
+  if (curPage === 2) renderWh();
+  if (curPage === 3) renderShop();
+  renderLog();
+}
+
+// 页 2：仓库 / 载重 —— 内嵌多仓 + 车背包
+// 注意：主循环每 250ms 调 renderAll，若每次都 open 会重建 DOM 打断拖拽。
+// 故仅在未打开时 open；已打开则跳过（拖拽中更不能重建）。
+function renderWh() {
+  if (LunarInv.isDragging()) return;       // 拖拽中绝不重建
+  if (LunarInv.isOpen()) return;           // 已渲染，主循环重复调用时跳过（避免每 250ms 重建打断拖拽）
+  LunarInv.open({ mode:'warehouse', mount: document.getElementById('page-wh') });
+  // 临时：生成测试物品按钮（接采集后删除）
+  const host = document.getElementById('page-wh');
+  if (host && !document.getElementById('genTestBtn')) {
+    const btn = document.createElement('button');
+    btn.id = 'genTestBtn';
+    btn.textContent = '＋ 生成测试物品';
+    btn.style.cssText = 'position:absolute;top:10px;right:16px;z-index:50;background:rgba(140,180,240,0.15);'
+      + 'border:1px solid rgba(140,180,240,0.5);color:rgba(220,235,255,0.95);padding:6px 14px;'
+      + 'font-family:inherit;font-size:12px;letter-spacing:0.1em;cursor:pointer;border-radius:3px;';
+    btn.addEventListener('click', genTestItems);
+    host.style.position = 'relative';
+    host.appendChild(btn);
+  }
+}
+
+// 临时：往当前存档塞一批测试物品（七种），刷新即见
+function genTestItems() {
+  SaveSys.patchCurrent(d => {
+    if (!d.inventory) return;
+    // 重置所有仓库到固定尺寸 24×10 + 清空
+    d.inventory.warehouses.forEach(w => { w.cols = 24; w.rows = 10; w.items = []; });
+    d.inventory.rover.items = [];
+  });
+  SaveSys.invAdd('wh0','soil',800);  SaveSys.invAdd('wh0','ice',300);
+  SaveSys.invAdd('wh0','titanium',12); SaveSys.invAdd('wh0','battery',4);
+  SaveSys.invAdd('wh0','oxytank',3); SaveSys.invAdd('wh0','drill',2);
+  SaveSys.invAdd('wh0','reactor',1);
+  SaveSys.invAdd('rover','soil',120); SaveSys.invAdd('rover','battery',1);
+  LunarInv.refresh();   // 立即重绘显示
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  翻页系统
+// ══════════════════════════════════════════════════════════════════════
+
+const PAGE_COUNT = 4;
+let curPage = 0;
+const track = document.getElementById('track');
+const dots  = document.getElementById('page-dots');
+
+// 初始化页码指示器
+for (let i=0; i<PAGE_COUNT; i++) {
+  const d = document.createElement('span');
+  d.className = 'dot' + (i===0?' active':'');
+  dots.appendChild(d);
+}
+
+function goToPage(idx) {
+  curPage = Math.max(0, Math.min(PAGE_COUNT-1, idx));
+  // 设位移。注意：内容重的页(仓库)渲染会触发 reflow 打断 transition 动画，
+  // 导致 transform 卡在起点(0)→页面停屏外。故瞬时跳转保证位移必定生效。
+  track.style.transition = 'none';
+  track.style.transform = `translateX(-${curPage * 100}%)`;
+  void track.offsetWidth;
+  requestAnimationFrame(() => { track.style.transition = ''; });
+  // 只让当前页可交互（防错位时非当前页吞事件）
+  [...track.children].forEach((p,i) => p.classList.toggle('page-active', i===curPage));
+  // 更新 dots
+  [...dots.children].forEach((d,i) => d.classList.toggle('active', i===curPage));
+  // 更新箭头可见性
+  document.getElementById('arrow-left').style.display  = curPage===0 ? 'none' : '';
+  document.getElementById('arrow-right').style.display = curPage===PAGE_COUNT-1 ? 'none' : '';
+  // 即时渲染新页面
+  if (curPage === 0) renderDash();
+  if (curPage === 1 && !_camRendered) { renderCam(); _camRendered = true; }
+  if (curPage === 2) renderWh();
+  if (curPage === 3) renderShop();
+  // 切到相机页 → 自动 focus iframe，让 WASD 直接在 3D 场景生效
+  if (curPage === 1) {
+    setTimeout(() => {
+      const f = document.querySelector('.cam-view iframe');
+      if (f && f.contentWindow) f.contentWindow.focus();
+    }, 380);
+  }
+}
+
+document.getElementById('arrow-left').addEventListener('click',  () => goToPage(curPage-1));
+document.getElementById('arrow-right').addEventListener('click', () => goToPage(curPage+1));
+
+// 键盘
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft')  goToPage(curPage-1);
+  if (e.key === 'ArrowRight') goToPage(curPage+1);
+  if (e.key === 'Escape') {
+    saveState(); location.href = 'outside_new.html';
+  }
+});
+
+// ── 拖拽翻页 ──
+let dragStartX = 0, dragStartOff = 0, dragging = false;
+
+track.addEventListener('mousedown', e => {
+  if (e.target.closest('.cam-view,.cam-minimap')) return;
+  // 仓库页：在物品/网格/切仓栏上按下=操作背包，不翻页；只有空白处按下才翻页
+  if (curPage === 2) {
+    if (e.target.closest('.li-item,.li-grid,.li-tabs,#genTestBtn')) return;
+    if (window.LunarInv && LunarInv.isDragging()) return;  // 正在拿/拖物品时不翻页
+  }
+  dragging = true; dragStartX = e.clientX;
+  dragStartOff = -curPage * track.parentElement.offsetWidth;
+  track.classList.add('dragging');
+  e.preventDefault();
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const dx = e.clientX - dragStartX;
+  track.style.transform = `translateX(${dragStartOff + dx}px)`;
+});
+window.addEventListener('mouseup', e => {
+  if (!dragging) return;
+  dragging = false;
+  track.classList.remove('dragging');
+  const dx = e.clientX - dragStartX;
+  const w = track.parentElement.offsetWidth;
+  goToPage(dx < -w*0.2 ? curPage+1 : dx > w*0.2 ? curPage-1 : curPage);
+});
+
+// 触摸
+track.addEventListener('touchstart', e => {
+  if (e.target.closest('.cam-view,.cam-minimap')) return;
+  if (curPage === 2) {
+    if (e.target.closest('.li-item,.li-grid,.li-tabs,#genTestBtn')) return;
+    if (window.LunarInv && LunarInv.isDragging()) return;
+  }
+  dragging = true; dragStartX = e.touches[0].clientX;
+  dragStartOff = -curPage * track.parentElement.offsetWidth;
+  track.classList.add('dragging');
+}, {passive:false});
+window.addEventListener('touchmove', e => {
+  if (!dragging) return;
+  const dx = e.touches[0].clientX - dragStartX;
+  track.style.transform = `translateX(${dragStartOff + dx}px)`;
+}, {passive:false});
+window.addEventListener('touchend', e => {
+  if (!dragging) return;
+  dragging = false;
+  track.classList.remove('dragging');
+  const dx = (e.changedTouches[0]?.clientX||0) - dragStartX;
+  const w = track.parentElement.offsetWidth;
+  goToPage(dx < -w*0.2 ? curPage+1 : dx > w*0.2 ? curPage-1 : curPage);
+});
+
+// 转发 3D 场景的位置到小地图 iframe + 接收地形就绪信号
+let _liveReady = false;
+let _lastPosUpdate = null;   // 缓存最近一条，供 map 加载完补发
+let _autoCollectOn = false;  // 自动采集开关（base 侧 UI 状态）
+// IFRAME-COMM: base 总线 — 接收 outside/lunar-map 消息，转发/响应
+window.addEventListener('message', (e) => {
+  // IFRAME-COMM: outside→base 月壤采集上报 → base 唯一加到 soil（单一真相）→ 回传 soilTotal
+  if (e.data && e.data.type === 'collectSoil') {
+    S.resources.soil = (S.resources.soil||0) + (e.data.amount||0);
+    // 记录发现的月壤点（稳定 id → 经纬度），供地图浅蓝点 + 自动采集导航
+    if (e.data.rockId) {
+      SaveSys.patchCurrent(s => {
+        s.discoveredRocks = s.discoveredRocks || {};
+        s.discoveredRocks[e.data.rockId] = { lat:e.data.lat, lon:e.data.lon };
+      });
+    }
+    saveState();
+    const cf = document.querySelector('.cam-view iframe');
+    if (cf && cf.contentWindow) cf.contentWindow.postMessage({type:'soilTotal', total:Math.floor(S.resources.soil)}, '*');
+    return;
+  }
+  // IFRAME-COMM: outside→base 加载完要初始 soil + 已发现月壤 → 回传
+  if (e.data && e.data.type === 'reqSoil') {
+    const cf = document.querySelector('.cam-view iframe');
+    const disc = SaveSys.get('discoveredRocks') || {};
+    if (cf && cf.contentWindow) cf.contentWindow.postMessage({
+      type:'soilTotal', total:Math.floor(S.resources.soil),
+      discoveredIds: Object.keys(disc)
+    }, '*');
+    return;
+  }
+  // IFRAME-COMM: outside→base 车/基地经纬度+sunAngle，base 转发给 lunar-map（附带已发现月壤点）
+  if (e.data && e.data.type === 'posUpdate') {
+    const fwd = Object.assign({}, e.data, { discovered: SaveSys.get('discoveredRocks') || {} });
+    _lastPosUpdate = fwd;
+    const mf = document.getElementById('rect-minimap-frame');
+    if (mf && mf.contentWindow) {
+      mf.contentWindow.postMessage(fwd, '*');
+    }
+  }
+  // IFRAME-COMM: lunar-map→base 地图加载完 → 补发最近状态（消除晨昏线滞后）
+  if (e.data && e.data.type === 'mapReady') {
+    if (_lastPosUpdate) {
+      const mf = document.getElementById('rect-minimap-frame');
+      if (mf && mf.contentWindow) mf.contentWindow.postMessage(_lastPosUpdate, '*');
+    }
+  }
+  // IFRAME-COMM: outside→base 地形就绪 → 关雪花屏
+  if (e.data && e.data.type === 'terrainReady') {
+    _liveReady = true;
+    hideSnow();
+  }
+  // IFRAME-COMM: outside→base 方向键转回（iframe 焦点时）→ 翻页/进 outside
+  if (e.data && e.data.type === 'navKey') {
+    if (e.data.key === 'ArrowLeft')  goToPage(curPage - 1);
+    if (e.data.key === 'ArrowRight') goToPage(curPage + 1);
+    if (e.data.key === 'Escape') { saveState(); location.href = 'outside_new.html'; }
+  }
+});
+
+// ── 雪花屏 ──
+let _snowRAF = 0;
+function startSnow() {
+  const cv = document.getElementById('snowCanvas');
+  const lb = document.getElementById('snowLabel');
+  if (!cv) return;
+  cv.style.display = 'block';
+  if (lb) lb.style.display = 'block';
+  const ctx = cv.getContext('2d');
+  // 1:1 渲染（匹配显示像素）→ 颗粒细
+  const rect = cv.getBoundingClientRect();
+  const W = Math.max(640, Math.round(rect.width));
+  const H = Math.max(360, Math.round(rect.height));
+  cv.width = W; cv.height = H;
+  const img = ctx.createImageData(W, H);
+  const data = img.data;
+  const N = W * H;
+  function tick() {
+    // 用 Math.random 一次性写入，循环展开省点开销
+    for (let i = 0; i < N; i++) {
+      const v = (Math.random() * 255) | 0;
+      const j = i * 4;
+      data[j] = v; data[j+1] = v; data[j+2] = v; data[j+3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    _snowRAF = requestAnimationFrame(tick);
+  }
+  tick();
+}
+function hideSnow() {
+  cancelAnimationFrame(_snowRAF);
+  _snowRAF = 0;
+  const cv = document.getElementById('snowCanvas');
+  const lb = document.getElementById('snowLabel');
+  if (cv) cv.style.display = 'none';
+  if (lb) lb.style.display = 'none';
+}
+
+// ── iframe 焦点：鼠标进入 cam-view 自动 focus（双保险，不依赖手动 click） ──
+document.addEventListener('mouseenter', e => {
+  // 只在 cam-view 区域上响应
+  const t = e.target;
+  if (t && t.closest && t.closest('.cam-view')) {
+    const f = document.querySelector('.cam-view iframe');
+    if (f && f.contentWindow) f.contentWindow.focus();
+  }
+}, true);
+
+// IFRAME-COMM: base→outside 键盘事件转发（WASD 控小车，base 有焦点时）
+document.addEventListener('keydown', e => {
+  const camFrame = document.querySelector('.cam-view iframe');
+  if (camFrame && camFrame.contentWindow) {
+    camFrame.contentWindow.postMessage({ type:'key', key:e.code, down:true }, '*');
+  }
+});
+document.addEventListener('keyup', e => {
+  const camFrame = document.querySelector('.cam-view iframe');
+  if (camFrame && camFrame.contentWindow) {
+    camFrame.contentWindow.postMessage({ type:'key', key:e.code, down:false }, '*');
+  }
+});
+
+// 初始化
+goToPage(0);
+
+// ══════════════════════════════════════════════════════════════════════
+//  退出
+// ══════════════════════════════════════════════════════════════════════
+
+document.getElementById('exit-btn').addEventListener('click', () => {
+  saveState(); location.href = 'outside_new.html';
+});
+
+// ══════════════════════════════════════════════════════════════════════
+//  主循环
+// ══════════════════════════════════════════════════════════════════════
+
+let lastTick = performance.now();
+let renderPending = false;
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  let dt = (now - lastTick) / 1000;
+  if (dt<=0) dt=0.016; if (dt>0.2) dt=0.2;
+  lastTick = now;
+  tick(dt);
+  if (!renderPending) {
+    renderPending = true;
+    setTimeout(() => { renderAll(); renderPending = false; }, 250);
+  }
+}
+
+// ── 初始化 ──
+// outside 直接写 base.resources.soil，loadState 已读取，无需额外桥接
+
+renderAll();
+requestAnimationFrame(loop);
+window.addEventListener('beforeunload', saveState);
+console.log('[Base] v0.3 ready — pages:', PAGE_COUNT);
+</script>
+</body>
+</html>

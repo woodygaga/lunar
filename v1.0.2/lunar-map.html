@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lunar Map</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; background:#050810; color:#e8eaf0; font-family:'Segoe UI','PingFang SC',sans-serif; overflow:hidden; }
+  #toolbar { position:fixed; top:0; left:0; right:0; height:42px; z-index:10; background:rgba(15,20,30,0.85); border-bottom:1px solid rgba(140,180,240,0.25); display:flex; align-items:center; padding:0 14px; gap:14px; backdrop-filter:blur(8px); }
+  #toolbar .title { font-size:13px; letter-spacing:0.3em; color:rgba(180,220,255,0.7); }
+  #info { margin-left:auto; font-size:11px; color:rgba(180,220,255,0.45); letter-spacing:0.1em; }
+  #stage { position:fixed; top:42px; left:0; right:0; bottom:0; overflow:hidden; cursor:grab; background:#050810; touch-action:none; }
+  body.embed #toolbar { display:none; } body.embed #stage { top:0; }
+  body.embed .coord-readout { font-size:9px; padding:3px 6px; bottom:6px; left:6px; letter-spacing:0.05em; }
+  #stage.dragging { cursor:grabbing; }
+
+  .layer {
+    position:absolute; top:0; left:0; transform-origin:0 0; display:flex;
+  }
+  .layer img, .layer canvas { display:block; user-select:none; -webkit-user-drag:none; }
+  #wrap-container img { image-rendering:pixelated; }
+  #term-canvas { pointer-events:none; z-index:3; mix-blend-mode:multiply; }
+  #contour-container { pointer-events:none; z-index:2; }
+  #contour-container img { mix-blend-mode:screen; }
+  #grid-canvas { position:fixed; inset:0; z-index:4; pointer-events:none; }
+
+  /* 比例尺 */
+  #scalebar { position:fixed; bottom:14px; right:14px; z-index:11; pointer-events:none; font-family:monospace; color:rgba(180,220,255,0.85); font-size:10px; letter-spacing:0.05em; text-align:center; }
+  #scalebar-line { height:4px; border:1px solid rgba(180,220,255,0.7); border-top:none; margin-bottom:3px; transition:width 0.05s; }
+  body.embed #scalebar { bottom:8px; right:8px; font-size:9px; }
+
+  .coord-readout { position:fixed; bottom:14px; left:14px; z-index:10; background:rgba(0,0,0,0.55); border:1px solid rgba(140,180,240,0.3); border-radius:3px; padding:6px 12px; font-size:11px; letter-spacing:0.08em; color:rgba(180,220,255,0.85); font-family:monospace; white-space:pre; }
+  .base-marker, .rover-marker { position:absolute; pointer-events:none; width:28px; height:28px; transform:translate(-50%,-50%); display:none; }
+  .base-marker { z-index:5; filter:drop-shadow(0 0 5px rgba(40,160,255,0.7)); }
+  .rover-marker { z-index:6; filter:drop-shadow(0 0 5px rgba(255,50,30,0.75)); }
+  .base-marker svg, .rover-marker svg { width:100%; height:100%; display:block; }
+  .rover-rot { transform-box:view-box; transform-origin:14px 14px; }   /* 绕圆心(14,14)旋转 */
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span class="title">LUNAR · MAP</span>
+  <div id="info">滚轮缩放 · 拖拽平移 · 东西循环</div>
+</div>
+
+<div id="stage">
+  <div id="wrap-container" class="layer">
+    <img id="img1" alt="map"><img id="img2" alt="map"><img id="img3" alt="map">
+  </div>
+  <div id="contour-container" class="layer">
+    <img id="cimg1" alt="c"><img id="cimg2" alt="c"><img id="cimg3" alt="c">
+  </div>
+  <canvas id="term-canvas" class="layer"></canvas>
+</div>
+<!-- 经纬网格（视口空间全屏 canvas） -->
+<canvas id="grid-canvas"></canvas>
+
+<div class="rover-marker"><svg viewBox="0 0 28 28"><g class="rover-rot"><circle cx="14" cy="14" r="6" fill="rgba(255,70,50,0.95)" stroke="#fff" stroke-width="1.6"/><polygon points="14,1 9,9.5 19,9.5" fill="rgba(255,70,50,0.98)" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></g></svg></div>
+<div class="rover-marker"><svg viewBox="0 0 28 28"><g class="rover-rot"><circle cx="14" cy="14" r="6" fill="rgba(255,70,50,0.95)" stroke="#fff" stroke-width="1.6"/><polygon points="14,1 9,9.5 19,9.5" fill="rgba(255,70,50,0.98)" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></g></svg></div>
+<div class="rover-marker"><svg viewBox="0 0 28 28"><g class="rover-rot"><circle cx="14" cy="14" r="6" fill="rgba(255,70,50,0.95)" stroke="#fff" stroke-width="1.6"/><polygon points="14,1 9,9.5 19,9.5" fill="rgba(255,70,50,0.98)" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></g></svg></div>
+<div class="base-marker"><svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="rgba(40,150,255,0.2)" stroke="rgba(90,185,255,0.55)" stroke-width="1"/><path d="M6.5,16.5 A7.5,7.5 0 0 1 21.5,16.5 Z" fill="rgba(45,170,255,0.97)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><rect x="12" y="13" width="4" height="3.5" rx="0.5" fill="#fff"/></svg></div>
+<div class="base-marker"><svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="rgba(40,150,255,0.2)" stroke="rgba(90,185,255,0.55)" stroke-width="1"/><path d="M6.5,16.5 A7.5,7.5 0 0 1 21.5,16.5 Z" fill="rgba(45,170,255,0.97)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><rect x="12" y="13" width="4" height="3.5" rx="0.5" fill="#fff"/></svg></div>
+<div class="base-marker"><svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="rgba(40,150,255,0.2)" stroke="rgba(90,185,255,0.55)" stroke-width="1"/><path d="M6.5,16.5 A7.5,7.5 0 0 1 21.5,16.5 Z" fill="rgba(45,170,255,0.97)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><rect x="12" y="13" width="4" height="3.5" rx="0.5" fill="#fff"/></svg></div>
+<div class="coord-readout" id="coord">LAT ----° LON ----°</div>
+
+<!-- 比例尺 -->
+<div id="scalebar"><div id="scalebar-line"></div><span id="scalebar-text">-- km</span></div>
+
+<script src="storage.js"></script>
+<script>
+// 等距矩形（唯一投影）
+const MAP = {
+  src:'resource/textures/lunar_map_image.png', w:8192, h:4096,
+  yToLat(yn){ return (0.5-yn)*Math.PI; },
+  yNormToLat(yn){ return (0.5-yn)*Math.PI; },
+  latToYNorm(ld){ return (90-ld)/180; }
+};
+// 等高线分档：按 scale 切换不同 stroke 的 SVG（放大用细线，缩小用粗线）
+const CONTOUR_LODS = [
+  { maxScale: 2,  src:'resource/textures/contour_far.svg?v=5'  },  // 缩小：粗
+  { maxScale: 8,  src:'resource/textures/contour_mid.svg?v=5'  },  // 中
+  { maxScale: 99, src:'resource/textures/contour_near.svg?v=5' },  // 放大：细
+];
+let _contourLod = -1;   // 当前档
+
+// 用上次缓存值初始化 → iframe 一加载就画对晨昏线 + 车/基地标记，不等首条消息
+const _cachePos = JSON.parse(localStorage.getItem('lunarMapPos')||'{}');
+let roverLat = _cachePos.rLat ?? null, roverLon = _cachePos.rLon ?? null;
+let baseLat  = _cachePos.bLat ?? null, baseLon  = _cachePos.bLon ?? null;
+let roverHeading = 0;
+let _discovered = {};        // 已发现月壤点 id→{lat,lon} → 浅蓝小点
+let _autoTarget = null;      // 自动采集目标 {lat,lon} → 浅蓝虚线
+// 世界时间：全局推算（不缓存，直接算）
+let sunAngle=(window.SaveSys && SaveSys.getSunAngle()) || 0, lastSunDrawn=-999;
+let scale=1, tx=0, ty=0;
+
+const stage=document.getElementById('stage');
+const wrap=document.getElementById('wrap-container');
+const cont=document.getElementById('contour-container');
+const termOverlay=document.getElementById('term-canvas');
+const imgs=[document.getElementById('img1'),document.getElementById('img2'),document.getElementById('img3')];
+const cimgs=[document.getElementById('cimg1'),document.getElementById('cimg2'),document.getElementById('cimg3')];
+const tCan=document.getElementById('term-canvas');
+const tCtx=tCan.getContext('2d');
+const markers=document.querySelectorAll('.rover-marker');
+const baseMarkers=document.querySelectorAll('.base-marker');
+
+const TERM_W = 128; // 低分辨率，CSS 放大 + pixelated 渲染 // terminator canvas 分辨率
+
+// IFRAME-COMM: base→lunar-map 转发的 posUpdate（车/基地经纬度）→ 更新标记
+// 注：sunAngle 不再从消息取，改全局推算（见下方自循环）
+window.addEventListener('message', e => {
+  if(e.data&&e.data.type==='posUpdate'){
+    roverLat=e.data.rover.lat; roverLon=e.data.rover.lon;
+    baseLat=e.data.base.lat; baseLon=e.data.base.lon;
+    if(typeof e.data.rover.heading==='number') roverHeading=e.data.rover.heading;
+    if(e.data.discovered) _discovered=e.data.discovered;        // 已发现月壤点 id→{lat,lon}
+    _autoTarget = e.data.autoTarget || null;                    // 自动采集目标 {lat,lon} 或 null
+    localStorage.setItem('lunarMapPos', JSON.stringify({rLat:roverLat,rLon:roverLon,bLat:baseLat,bLon:baseLon}));
+    updateMarker();
+    drawGrid();   // 重画网格+月壤点+虚线
+  }
+});
+
+// ── Terminator 绘制（仅在太阳移动时） ──
+function drawTerminator(force){
+  lastSunDrawn=sunAngle;
+
+  const m=MAP;
+  const COPIES=3;
+  const cw=TERM_W, fullW=cw*COPIES;
+  const ch=Math.round(TERM_W*m.h/m.w);
+  const sx=Math.cos(sunAngle), sy=Math.sin(sunAngle), sz=0.3;
+  const sl=Math.sqrt(sx*sx+sy*sy+sz*sz);
+  const sxn=sx/sl, syn=sy/sl, szn=sz/sl;
+
+  if(tCan.width!==fullW||tCan.height!==ch){ tCan.width=fullW; tCan.height=ch; }
+  tCan.style.width=(m.w*COPIES)+'px'; tCan.style.height=m.h+'px';
+
+  const imgData=tCtx.createImageData(fullW,ch);
+  for(let py=0;py<ch;py++){
+    const yNorm=py/(ch-1), lat=m.yNormToLat(yNorm);
+    const cl=Math.cos(lat), slat=Math.sin(lat);
+    for(let copy=0;copy<COPIES;copy++){
+      const offX=copy*cw;
+      for(let px=0;px<cw;px++){
+        const lon=(px/(cw-1))*Math.PI*2-Math.PI;
+        const dot=cl*Math.cos(lon)*sxn+slat*syn+cl*Math.sin(lon)*szn;
+        let a=0;
+        if(dot<-0.15)a=200; else if(dot<0.15)a=Math.round((0.15-dot)/0.30*200);
+        const i=((py*fullW)+offX+px)*4;
+        imgData.data[i]=0; imgData.data[i+1]=0; imgData.data[i+2]=8; imgData.data[i+3]=a;
+      }
+    }
+  }
+  tCtx.putImageData(imgData,0,0);
+}
+
+// ── 地图加载 ──
+function loadMap(){
+  const m=MAP;
+  imgs.forEach(i=>{ i.src=m.src; i.style.width=m.w+'px'; i.style.height=m.h+'px'; });
+  cimgs.forEach(i=>{ i.style.width=m.w+'px'; i.style.height=m.h+'px'; i.style.flexShrink='0'; });
+  const sH=stage.clientHeight;
+  if (sH < 10) { requestAnimationFrame(loadMap); return; }   // 布局未完成 → 下帧重试，避免 scale=0
+  scale=sH/m.h;
+  tx=(stage.clientWidth-m.w*scale)/2-m.w*scale; ty=0;
+  _contourLod=-1; updateContourLod();
+  lastSunDrawn=-999; drawTerminator(true);
+  apply();
+}
+
+// 按当前 scale 选等高线档，切 src（仅在跨档时换，避免频繁重载）
+function updateContourLod(){
+  let lod=0;
+  for(let i=0;i<CONTOUR_LODS.length;i++){ if(scale<=CONTOUR_LODS[i].maxScale){ lod=i; break; } lod=i; }
+  if(lod!==_contourLod){
+    _contourLod=lod;
+    cimgs.forEach(i=>{ i.src=CONTOUR_LODS[lod].src; });
+  }
+}
+
+function apply(){
+  const t=`translate(${tx}px,${ty}px) scale(${scale})`;
+  wrap.style.transform=t; cont.style.transform=t; termOverlay.style.transform=t;
+  updateContourLod();
+  updateMarker();
+  drawGrid();
+  updateScalebar();
+}
+
+// ── 经纬网格（视口空间 canvas）──
+
+const gCan=document.getElementById('grid-canvas');
+const gCtx=gCan.getContext('2d');
+function drawGrid(){
+  const m=MAP, W=stage.clientWidth, H=stage.clientHeight;
+  if(gCan.width!==W||gCan.height!==H){ gCan.width=W; gCan.height=H; }
+  gCtx.clearRect(0,0,W,H);
+  const mapH=m.h*scale;
+  const yTop=Math.max(0,ty), yBot=Math.min(H,ty+mapH);
+  const bigPx = currentGridKm()/kmPerPx();   // 大格像素
+  const smallPx = bigPx/5;                    // 小格 = 大格 1/5
+
+  // 画一级网格的辅助
+  function drawLevel(cellPx, color, lw){
+    if(!isFinite(cellPx)||cellPx<5) return;
+    gCtx.strokeStyle=color; gCtx.lineWidth=lw;
+    let x0 = tx % cellPx; if(x0>0) x0-=cellPx;
+    for(let x=x0; x<=W; x+=cellPx){ gCtx.beginPath(); gCtx.moveTo(x,0); gCtx.lineTo(x,H); gCtx.stroke(); }
+    let y0 = ty % cellPx; if(y0>0) y0-=cellPx;
+    for(let y=y0; y<=H; y+=cellPx){ if(y<yTop-1||y>yBot+1) continue; gCtx.beginPath(); gCtx.moveTo(0,y); gCtx.lineTo(W,y); gCtx.stroke(); }
+  }
+  // 先小格（浅），后大格（深）盖上
+  drawLevel(smallPx, 'rgba(150,195,255,0.14)', 0.6);
+  drawLevel(bigPx,   'rgba(150,195,255,0.20)', 1.0);
+
+  // 经纬度 → 屏幕坐标（考虑东西循环，返回 [-1,0,+1] 三个副本里在屏内的 x）
+  const oneW = m.w*scale;
+  function ll2screen(lat,lon){
+    const u=(lon+180)/360, yN=m.latToYNorm(lat);
+    return { xs:[tx+u*oneW-oneW, tx+u*oneW, tx+u*oneW+oneW], y:ty+yN*mapH };
+  }
+
+  // ── 已发现月壤点：浅蓝小点 ──
+  gCtx.fillStyle='rgba(120,190,255,0.35)';
+  for(const id in _discovered){
+    const d=_discovered[id]; const p=ll2screen(d.lat,d.lon);
+    if(p.y<-4||p.y>H+4) continue;
+    for(const x of p.xs){ if(x<-4||x>W+4) continue;
+      gCtx.beginPath(); gCtx.arc(x,p.y,2.5,0,Math.PI*2); gCtx.fill();
+    }
+  }
+
+  // ── 自动采集目标：车→目标 浅蓝虚线 ──
+  if(_autoTarget && roverLat!==null){
+    const rp=ll2screen(roverLat,roverLon), tp=ll2screen(_autoTarget.lat,_autoTarget.lon);
+    // 选「在屏幕内」的车副本，再取离它最近的目标副本（避免线画到屏外）
+    let bestRX=rp.xs[1];
+    for(const rx of rp.xs){ if(rx>=-50 && rx<=W+50){ bestRX=rx; break; } }
+    let bestTX=tp.xs[1], bestD=Infinity;
+    for(const txx of tp.xs){ const dd=Math.abs(txx-bestRX); if(dd<bestD){bestD=dd;bestTX=txx;} }
+    gCtx.save();
+    gCtx.strokeStyle='rgba(150,205,255,0.6)';   // 浅蓝虚线
+    gCtx.lineWidth=1.4; gCtx.setLineDash([6,5]);
+    gCtx.beginPath(); gCtx.moveTo(bestRX,rp.y); gCtx.lineTo(bestTX,tp.y); gCtx.stroke();
+    gCtx.restore();
+  }
+}
+
+// ── 比例尺 + 网格（月球半径 30km）──
+// 等距矩形：赤道处 X、Y 的 km/px 相等 → 正方形网格成立
+const MOON_R_KM = 30;
+const MOON_CIRC_KM = 2*Math.PI*MOON_R_KM;   // ≈188.5 km 赤道周长
+function kmPerPx(){ return MOON_CIRC_KM/(MAP.w*scale); }
+// 当前"好看"的格距 km（80px 目标，取整到 1/2/5×10^n）
+function currentGridKm(){
+  const target = kmPerPx()*80;
+  const pow=Math.pow(10,Math.floor(Math.log10(target)));
+  const mant=target/pow;
+  const nice=mant<1.5?1:mant<3.5?2:mant<7.5?5:10;
+  return nice*pow;
+}
+function updateScalebar(){
+  const km=currentGridKm();
+  const px=km/kmPerPx();
+  document.getElementById('scalebar-line').style.width=px+'px';
+  document.getElementById('scalebar-text').textContent =
+    (km<1?(km*1000).toFixed(0)+' m':km+' km');
+}
+
+// ── 标记 ──
+function placeMarkers(els,lat,lon,heading){
+  const m=MAP; const oneW=m.w*scale;
+  if(lat===null||lon===null){ els.forEach(e=>e.style.display='none'); return; }
+  const u=(lon+180)/360, yNorm=m.latToYNorm(lat);
+  const bx=tx+u*m.w*scale, by_=ty+yNorm*m.h*scale;
+  els.forEach((e,i)=>{
+    e.style.left=(bx+i*oneW)+'px'; e.style.top=by_+'px'; e.style.display='block';
+    if(heading!==undefined){ const r=e.querySelector('.rover-rot'); if(r) r.style.transform='rotate('+heading+'deg)'; }
+  });
+}
+function updateMarker(){ placeMarkers(markers,roverLat,roverLon,roverHeading); placeMarkers(baseMarkers,baseLat,baseLon); }
+
+// ── 交互 ──
+let drag=null;
+stage.addEventListener('pointerdown',e=>{ drag={x:e.clientX,y:e.clientY,tx,ty}; stage.classList.add('dragging'); stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove',e=>{
+  updateCoord(e.clientX,e.clientY); if(!drag) return;
+  tx=drag.tx+(e.clientX-drag.x); ty=drag.ty+(e.clientY-drag.y);
+  const m=MAP, oneImgW=m.w*scale;
+  while(tx>0)tx-=oneImgW; while(tx<-2*oneImgW)tx+=oneImgW;
+  const vh=stage.clientHeight, mh=m.h*scale, hi=Math.max(0,vh-mh), lo=Math.min(0,vh-mh);
+  ty=Math.min(hi,Math.max(lo,ty)); apply();
+});
+stage.addEventListener('pointerup',()=>{ drag=null; stage.classList.remove('dragging'); });
+stage.addEventListener('pointercancel',()=>{ drag=null; stage.classList.remove('dragging'); });
+stage.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const f=Math.pow(1.0015,-e.deltaY), m=MAP;
+  const ns=Math.max(stage.clientHeight/m.h,Math.min(32,scale*f));   // 上限 32 → 最细约 50m
+  const cx=e.clientX,cy=e.clientY;
+  tx=cx-(cx-tx)*(ns/scale); ty=cy-(cy-ty)*(ns/scale);
+  scale=ns; const vh=stage.clientHeight, mh=m.h*scale;
+  ty=Math.min(Math.max(0,vh-mh),Math.max(Math.min(0,vh-mh),ty));
+  apply();
+},{passive:false});
+
+function updateCoord(px,py){
+  const m=MAP, oneImgW=m.w*scale;
+  const lx=((px-tx-oneImgW)%oneImgW+oneImgW)%oneImgW;
+  const th=document.body.classList.contains('embed')?0:42;
+  const u=lx/oneImgW, v=Math.max(0,Math.min(1,(py-ty-th)/(m.h*scale)));
+  document.getElementById('coord').textContent=`LAT ${(m.yToLat(v)*180/Math.PI).toFixed(1).padStart(6)}°  LON ${((u-0.5)*360).toFixed(1).padStart(6)}°`;
+}
+
+if (window.self !== window.top) {
+  document.body.classList.add('embed');
+  // IFRAME-COMM: lunar-map→base 加载完通知 → base 补发车/基地标记初值
+  try { window.parent.postMessage({type:'mapReady'}, '*'); } catch(e){}
+}
+loadMap();
+addEventListener('resize', loadMap);
+
+// 世界时间自循环：每秒按全局推算更新 sunAngle，重画晨昏线（独立于消息）
+setInterval(()=>{
+  if(!window.SaveSys) return;
+  sunAngle = SaveSys.getSunAngle();
+  drawTerminator();
+}, 1000);
+</script>
+</body>
+</html>

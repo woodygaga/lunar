@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>LUNAR · 登录</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; background:#04060c; color:#e8eaf0;
+    font-family:'Segoe UI','PingFang SC',sans-serif; letter-spacing:0.03em; user-select:none; }
+
+  /* 星空背景 */
+  body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(circle at 25% 20%, rgba(50,70,120,0.18), transparent 45%),
+      radial-gradient(circle at 78% 75%, rgba(40,55,95,0.12), transparent 50%); }
+  body::after { content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      radial-gradient(1px 1px at 18% 24%, #fff, transparent),
+      radial-gradient(1px 1px at 72% 38%, #aef, transparent),
+      radial-gradient(1px 1px at 44% 78%, #fff, transparent),
+      radial-gradient(2px 2px at 61% 18%, #fff, transparent),
+      radial-gradient(1px 1px at 88% 62%, #fff, transparent),
+      radial-gradient(1px 1px at 33% 55%, #ddf, transparent);
+    opacity:0.5; }
+
+  .wrap { position:relative; z-index:1; height:100%; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:40px 20px; }
+
+  /* 标题 */
+  h1 { font-weight:100; font-size:clamp(56px,11vw,120px); letter-spacing:0.32em;
+    color:#fff; text-shadow:0 0 40px rgba(140,180,240,0.3),0 0 80px rgba(120,150,210,0.15);
+    margin-right:-0.32em; margin-bottom:8px; animation:glow 6s ease-in-out infinite alternate; }
+  @keyframes glow {
+    0%{text-shadow:0 0 40px rgba(140,180,240,0.2),0 0 80px rgba(120,150,210,0.1);}
+    100%{text-shadow:0 0 60px rgba(140,180,240,0.4),0 0 120px rgba(120,150,210,0.25);} }
+  .subtitle { font-size:12px; color:rgba(180,220,255,0.4); letter-spacing:0.55em;
+    margin-right:-0.55em; text-transform:uppercase; margin-bottom:48px; }
+
+  /* 卡片容器 */
+  .panel { width:min(440px,92vw); background:rgba(12,18,30,0.7);
+    border:1px solid rgba(140,180,240,0.28); border-radius:6px; padding:28px 30px;
+    backdrop-filter:blur(8px); }
+
+  /* 登录区 */
+  .login-row { display:flex; gap:10px; align-items:center; }
+  .login-row label { font-size:11px; letter-spacing:0.2em; color:rgba(180,220,255,0.55); flex-shrink:0; }
+  #nameInput { flex:1; background:rgba(255,255,255,0.04); border:1px solid rgba(140,180,240,0.3);
+    border-radius:3px; padding:10px 12px; color:#fff; font-family:inherit; font-size:14px;
+    letter-spacing:0.05em; outline:none; }
+  #nameInput:focus { border-color:rgba(140,180,240,0.6); background:rgba(255,255,255,0.06); }
+  .btn { background:rgba(140,180,240,0.12); border:1px solid rgba(140,180,240,0.45);
+    color:rgba(220,235,255,0.95); padding:10px 18px; font-family:inherit; font-size:12px;
+    letter-spacing:0.1em; cursor:pointer; border-radius:3px; transition:background 0.15s; }
+  .btn:hover { background:rgba(140,180,240,0.24); }
+  .btn:disabled { opacity:0.35; cursor:not-allowed; }
+
+  /* 存档槽 */
+  #slots { margin-top:22px; display:none; flex-direction:column; gap:10px; }
+  .slot-title { font-size:10px; letter-spacing:0.25em; color:rgba(180,220,255,0.45);
+    text-transform:uppercase; margin-bottom:4px; }
+  .slot { display:flex; align-items:center; gap:12px; padding:14px 16px;
+    background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+    border-radius:4px; cursor:pointer; transition:border-color 0.15s,background 0.15s; }
+  .slot:hover { border-color:rgba(140,180,240,0.5); background:rgba(140,180,240,0.06); }
+  .slot .s-no { font-size:22px; font-weight:100; color:rgba(140,180,240,0.7); width:26px; text-align:center; flex-shrink:0; }
+  .slot .s-info { flex:1; min-width:0; }
+  .slot .s-name { font-size:13px; color:rgba(255,255,255,0.9); }
+  .slot .s-meta { font-size:10px; color:rgba(255,255,255,0.4); margin-top:2px; letter-spacing:0.04em; }
+  .slot.empty .s-name { color:rgba(255,255,255,0.35); }
+  .slot .s-del { font-size:10px; padding:4px 8px; border:1px solid rgba(255,120,100,0.3);
+    color:rgba(255,150,130,0.7); border-radius:2px; cursor:pointer; flex-shrink:0; }
+  .slot .s-del:hover { background:rgba(255,120,100,0.15); }
+
+  .back-link { margin-top:18px; font-size:11px; color:rgba(180,220,255,0.4);
+    cursor:pointer; letter-spacing:0.1em; text-align:center; }
+  .back-link:hover { color:rgba(180,220,255,0.7); }
+
+  .footer { position:fixed; bottom:18px; left:0; right:0; text-align:center;
+    font-size:10px; color:rgba(255,255,255,0.22); letter-spacing:0.35em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>LUNAR</h1>
+  <div class="subtitle">Moon Rover · Survival</div>
+
+  <div class="panel">
+    <!-- 登录区 -->
+    <div id="loginArea">
+      <div class="login-row">
+        <label>指挥官</label>
+        <input id="nameInput" type="text" maxlength="16" placeholder="输入你的名字" autocomplete="off">
+        <button class="btn" id="enterBtn">进入</button>
+      </div>
+    </div>
+
+    <!-- 存档槽 -->
+    <div id="slots">
+      <div class="slot-title">选择存档 · <span id="curPlayer"></span></div>
+      <div id="slotList"></div>
+      <div class="back-link" id="backBtn">← 切换指挥官</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">THREE.JS · 2026</div>
+
+<script src="storage.js"></script>
+<script>
+const nameInput = document.getElementById('nameInput');
+const enterBtn  = document.getElementById('enterBtn');
+const loginArea = document.getElementById('loginArea');
+const slotsBox  = document.getElementById('slots');
+const slotList  = document.getElementById('slotList');
+
+// 自动填充上次玩家名
+const last = SaveSys.getActivePlayer();
+if (last) nameInput.value = last;
+
+function fmtTime(sec){
+  if(sec<60) return sec+'秒';
+  if(sec<3600) return Math.floor(sec/60)+'分钟';
+  return (sec/3600).toFixed(1)+'小时';
+}
+function fmtDate(ts){
+  const d=new Date(ts);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+let curPlayer = '';
+
+function enterPlayer(){
+  const name = nameInput.value.trim();
+  if(!name) { nameInput.focus(); return; }
+  curPlayer = name;
+  SaveSys.setActivePlayer(name);
+  document.getElementById('curPlayer').textContent = name;
+  loginArea.style.display='none';
+  slotsBox.style.display='flex';
+  renderSlots();
+}
+
+function renderSlots(){
+  const slots = SaveSys.listSlots(curPlayer);
+  slotList.innerHTML='';
+  slots.forEach((s,i)=>{
+    const slotNo=i+1;
+    const div=document.createElement('div');
+    div.className='slot'+(s?'':' empty');
+    if(s){
+      div.innerHTML=`
+        <div class="s-no">${slotNo}</div>
+        <div class="s-info">
+          <div class="s-name">第 ${s.day} 天 · 月壤 ${s.soil}g</div>
+          <div class="s-meta">上次游玩 ${fmtDate(s.lastPlayed)} · 游戏时长 ${fmtTime(s.playtimeSec)}</div>
+        </div>
+        <div class="s-del" data-slot="${slotNo}">删除</div>`;
+      div.addEventListener('click',e=>{
+        if(e.target.classList.contains('s-del')) return;
+        SaveSys.continueGame(curPlayer, slotNo);
+        location.href='base.html';
+      });
+      div.querySelector('.s-del').addEventListener('click',e=>{
+        e.stopPropagation();
+        if(confirm(`确定删除存档 ${slotNo}？`)){
+          SaveSys.deleteSave(curPlayer, slotNo);
+          renderSlots();
+        }
+      });
+    } else {
+      div.innerHTML=`
+        <div class="s-no">${slotNo}</div>
+        <div class="s-info"><div class="s-name">— 空存档 · 开始新游戏 —</div></div>`;
+      div.addEventListener('click',()=>{
+        SaveSys.newGame(curPlayer, slotNo);
+        location.href='base.html';
+      });
+    }
+    slotList.appendChild(div);
+  });
+}
+
+enterBtn.addEventListener('click', enterPlayer);
+nameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') enterPlayer(); });
+document.getElementById('backBtn').addEventListener('click',()=>{
+  slotsBox.style.display='none';
+  loginArea.style.display='block';
+  nameInput.focus();
+});
+
+nameInput.focus();
+</script>
+</body>
+</html>
