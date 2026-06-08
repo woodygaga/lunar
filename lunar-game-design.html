@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lunar Survival · 月球穷游者 — 游戏设计文档</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a28;
+    --border: #2a2a3a;
+    --text: #c8c8d4;
+    --text-dim: #7a7a8a;
+    --accent: #4da6ff;
+    --accent2: #ff994d;
+    --accent3: #66cc88;
+    --warn: #ffcc44;
+    --danger: #ff5555;
+    --tier1: #8b9dc3;
+    --tier2: #5c9ce0;
+    --tier3: #c97dff;
+    --tier4: #ffb347;
+    --tier5: #ff6b6b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 2.2em;
+    text-align: center;
+    padding: 30px 0 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--text-dim);
+    margin-bottom: 40px;
+    font-size: 1.1em;
+  }
+  h2 {
+    font-size: 1.5em;
+    margin: 50px 0 20px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+    color: #fff;
+  }
+  h3 {
+    font-size: 1.15em;
+    margin: 25px 0 12px;
+    color: var(--accent);
+  }
+  h4 {
+    font-size: 1em;
+    margin: 15px 0 8px;
+    color: #ddd;
+  }
+
+  /* === CARD SYSTEM === */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .card-grid.col2 { grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); }
+  .card-grid.col4 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #444; }
+  .card h3 { margin-top: 0; }
+
+  /* Tier badge */
+  .tier {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .tier-t1 { background: #2a2e3a; color: var(--tier1); }
+  .tier-t2 { background: #1e2a3a; color: var(--tier2); }
+  .tier-t3 { background: #2a203a; color: var(--tier3); }
+  .tier-t4 { background: #3a2e1a; color: var(--tier4); }
+  .tier-t5 { background: #3a1a1a; color: var(--tier5); }
+
+  /* Stat row */
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px dotted #222;
+    font-size: 0.92em;
+  }
+  .stat-label { color: var(--text-dim); }
+  .stat-val { font-weight: 600; text-align: right; }
+
+  /* === TREE DIAGRAM === */
+  .tree {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    margin: 20px 0;
+    font-size: 0.9em;
+  }
+  .tree-node {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 18px;
+    text-align: center;
+    min-width: 180px;
+    position: relative;
+  }
+  .tree-arrow {
+    color: var(--text-dim);
+    font-size: 1.4em;
+    line-height: 1;
+    margin: 2px 0;
+  }
+  .tree-row {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* === FLOW CHART (RESOURCE) === */
+  .flow-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+    align-items: flex-start;
+    margin: 20px 0;
+  }
+  .flow-box {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    text-align: center;
+    min-width: 100px;
+    position: relative;
+  }
+  .flow-box.source { border-color: #4a6a4a; }
+  .flow-box.process { border-color: #4a5a7a; }
+  .flow-box.product { border-color: #6a5a3a; }
+  .flow-box.energy { border-color: #8a6a2a; }
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--text-dim);
+    font-size: 1.5em;
+    font-weight: bold;
+  }
+  .flow-label {
+    font-size: 0.75em;
+    color: var(--text-dim);
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* === STAT TABLE === */
+  .stat-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.9em;
+  }
+  .stat-table th {
+    background: var(--surface2);
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #aaa;
+    border-bottom: 2px solid var(--border);
+  }
+  .stat-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .stat-table tr:hover td { background: #1a1a24; }
+  .stat-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* === PROGRESS BAR === */
+  .bar-track {
+    height: 8px;
+    background: #1a1a24;
+    border-radius: 4px;
+    margin: 6px 0;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s;
+  }
+  .bar-lo { background: var(--tier1); }
+  .bar-md { background: var(--tier2); }
+  .bar-hi { background: var(--tier3); }
+  .bar-vhi { background: var(--tier4); }
+  .bar-max { background: var(--tier5); }
+
+  /* === DAY/NIGHT CYCLE === */
+  .cycle-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .cycle-seg {
+    flex: 1;
+    min-width: 200px;
+    padding: 16px;
+    border-radius: 10px;
+    text-align: center;
+  }
+  .cycle-day {
+    background: linear-gradient(135deg, #2a2a10, #3a3010);
+    border: 1px solid #5a5010;
+  }
+  .cycle-night {
+    background: linear-gradient(135deg, #10102a, #101020);
+    border: 1px solid #20205a;
+  }
+
+  /* === TAG === */
+  .tag {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+  }
+  .tag-buy { background: #2a3a2a; color: #6a6; }
+  .tag-make { background: #2a2a3a; color: #66a; }
+  .tag-rare { background: #3a2a2a; color: #a66; }
+  .tag-consume { background: #3a3a2a; color: #aa6; }
+
+  /* === RESPONSIVE === */
+  @media (max-width: 700px) {
+    .card-grid, .card-grid.col2, .card-grid.col4 { grid-template-columns: 1fr; }
+    .flow-container { flex-direction: column; align-items: center; }
+    .flow-arrow { transform: rotate(90deg); }
+  }
+
+  /* Nav TOC */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 28px;
+    columns: 2;
+    margin: 20px 0;
+  }
+  .toc a {
+    display: block;
+    color: var(--accent);
+    text-decoration: none;
+    padding: 3px 0;
+    font-size: 0.92em;
+  }
+  .toc a:hover { text-decoration: underline; }
+
+  .note {
+    background: #1a1a28;
+    border-left: 3px solid var(--warn);
+    padding: 10px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 12px 0;
+    font-size: 0.9em;
+  }
+  .note.idea {
+    border-left-color: var(--accent3);
+  }
+</style>
+</head>
+<body>
+
+<h1>🌙 Lunar Survival · 月球穷游者</h1>
+<p class="subtitle">增量放置 × 资源整合 · 游戏设计文档 v1.0<br>
+<small>风格对标：银河奶牛（Galaxy Cow）— 设备即装备，多级提升，每级解锁新内容</small></p>
+
+<!-- ==================== TOC ==================== -->
+<nav class="toc">
+  <a href="#overview">🎯 游戏概述</a>
+  <a href="#core-loop">🔄 核心资源循环</a>
+  <a href="#compressors">🔧 气体压缩机 (3级)</a>
+  <a href="#bottles">🫙 储气瓶 (4级)</a>
+  <a href="#batteries">🔋 电池系统 (5级)</a>
+  <a href="#energy">⚡ 能源系统</a>
+  <a href="#signal">📡 信号基站 (4级)</a>
+  <a href="#base">🏠 基地房间系统</a>
+  <a href="#progression">📈 科技树总览</a>
+  <a href="#numbers">📊 数值平衡参考</a>
+</nav>
+
+<!-- ==================== OVERVIEW ==================== -->
+<h2 id="overview">🎯 游戏概述</h2>
+
+<div class="card-grid">
+  <div class="card">
+    <h3>游戏类型</h3>
+    <p>增量放置 + 资源整合，类似<strong>银河奶牛（Galaxy Cow）</strong>。<br>
+    设备 = 装备，有多级升级树。每次提升解锁新内容。<br>
+    核心驱动：<strong>资源 → 设备 → 更多资源 → 更好设备</strong>。</p>
+  </div>
+  <div class="card">
+    <h3>世界观</h3>
+    <p>近未来，太空旅行已实现但昂贵。主角是<strong>太空穷游者</strong>，旅途中资金耗尽被迫停靠月球。<br>
+    目标：攒资源 → 修好/买到飞船 → 离开月球。<br>
+    <strong>科学范畴内</strong>，不玄幻。无死亡，惩罚 = 效率降低。</p>
+  </div>
+  <div class="card">
+    <h3>核心设计原则</h3>
+    <ul style="padding-left:20px">
+      <li>🔹 无 Game Over — 资源耗尽只降效率</li>
+      <li>🔹 网购兜底 — 所有关键物资可网购（贵）</li>
+      <li>🔹 多路线 — 同一种资源多种获取途径</li>
+      <li>🔹 副产物链 — 废物利用，深度技术树</li>
+      <li>🔹 放置友好 — 离线也有产出（需设备支持）</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==================== CORE LOOP ==================== -->
+<h2 id="core-loop">🔄 核心资源循环</h2>
+
+<p>游戏最基础的生产链（开局即可操作）：</p>
+
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;margin:20px 0;font-size:0.92em">
+  <div class="flow-box source">
+    <strong>🌑 月壤</strong>
+    <span class="flow-label">采集（月球车EVA）</span>
+  </div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box process" style="border-color:#8a5a2a">
+    <strong>🔥 加热炉</strong>
+    <span class="flow-label">加热月壤<br>耗电 · 白天盈余电力</span>
+  </div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box product" style="border-color:#4a6a8a">
+    <strong>💧 水</strong>
+    <span class="flow-label">基础生存资源</span>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+    <div class="flow-box" style="border-color:#6a4a4a;font-size:0.85em">
+      <strong>🗑 废料</strong>
+      <span class="flow-label">副产品 · 可精炼</span>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:4px;margin-left:8px">
+    <div class="flow-arrow" style="font-size:1em">↳</div>
+    <div class="flow-box process" style="border-color:#4a7a8a">
+      <strong>⚡ 电解槽</strong>
+      <span class="flow-label">电解水<br>耗电</span>
+    </div>
+  </div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box product" style="border-color:#4488aa">
+    <strong>🫧 O₂ 氧气</strong>
+    <span class="flow-label">释放到基地</span>
+  </div>
+  <div class="flow-box" style="border-color:#aa6644">
+    <strong>💨 H₂ 氢气</strong>
+    <span class="flow-label">初期排放<br>有压缩机后储存</span>
+  </div>
+</div>
+
+<div class="note">
+  <strong>初期设定：</strong>没有气体压缩机时，O₂ 直接释放到基地（无法携带），H₂ 直接排放浪费。<br>
+  购买气体压缩机 + 储气瓶后 → 可生产 <strong>氧气瓶</strong>（外出呼吸 &amp; 助燃剂）和 <strong>氢气瓶/燃料瓶</strong>（燃烧发电）。<br>
+  初期给玩家 <strong>够撑 2 次夜晚</strong> 的能量，让玩家摸透系统后再发展。
+</div>
+
+<!-- ==================== COMPRESSORS ==================== -->
+<h2 id="compressors">🔧 气体压缩机 — 3 级升级树</h2>
+<p>气体压缩机是<strong>制氧路线的必经节点</strong>——没有它就没有可携带气瓶，玩家无法外出 EVA。</p>
+
+<div class="card-grid col2">
+  <!-- Tier 1 -->
+  <div class="card">
+    <h3><span class="tier tier-t1">T1</span> 活塞式压缩机</h3>
+    <p style="color:var(--text-dim);margin:6px 0">初级 · 月球环境下损耗大</p>
+    <div class="stat-row"><span class="stat-label">输出压力</span><span class="stat-val">30 MPa</span></div>
+    <div class="stat-row"><span class="stat-label">生成速度</span><span class="stat-val">慢</span></div>
+    <div class="stat-row"><span class="stat-label">耗电</span><span class="stat-val">中</span></div>
+    <div class="stat-row"><span class="stat-label">气体纯度</span><span class="stat-val">中（可呼吸 / 燃料电池）</span></div>
+    <div class="stat-row"><span class="stat-label">气阀组损耗</span><span class="stat-val" style="color:var(--danger)">2% / 瓶 → 50次报废</span></div>
+    <h4 style="margin-top:12px">消耗品</h4>
+    <div class="stat-row"><span class="stat-label">🪫 气阀组</span><span class="stat-val"><span class="tag tag-buy">购买</span> <span class="tag tag-make">3D打印</span> 比机器便宜</span></div>
+    <div class="stat-row"><span class="stat-label">🛢 润滑油</span><span class="stat-val"><span class="tag tag-buy">仅购买</span> 1组用3次，每次永久 -0.2%/瓶损耗</span></div>
+  </div>
+
+  <!-- Tier 2 -->
+  <div class="card">
+    <h3><span class="tier tier-t2">T2</span> 离子式压缩机</h3>
+    <p style="color:var(--text-dim);margin:6px 0">中级 · 金属阀组，寿命更长</p>
+    <div class="stat-row"><span class="stat-label">输出压力</span><span class="stat-val">70 MPa</span></div>
+    <div class="stat-row"><span class="stat-label">生成速度</span><span class="stat-val">中</span></div>
+    <div class="stat-row"><span class="stat-label">耗电</span><span class="stat-val">中高</span></div>
+    <div class="stat-row"><span class="stat-label">气体纯度</span><span class="stat-val">高（高温生产燃料）</span></div>
+    <div class="stat-row"><span class="stat-label">金属阀组损耗</span><span class="stat-val" style="color:var(--warn)">1% / 瓶 → 100次</span></div>
+    <h4 style="margin-top:12px">消耗品</h4>
+    <div class="stat-row"><span class="stat-label">🔩 金属阀组</span><span class="stat-val"><span class="tag tag-buy">购买</span> <span class="tag tag-make">冶炼自制</span> 需铁矿+铬矿 1500℃</span></div>
+    <div class="stat-row"><span class="stat-label">🛢 液压油</span><span class="stat-val"><span class="tag tag-buy">仅购买</span> 消耗品</span></div>
+  </div>
+
+  <!-- Tier 3 -->
+  <div class="card">
+    <h3><span class="tier tier-t3">T3</span> 电化学压缩机</h3>
+    <p style="color:var(--text-dim);margin:6px 0">高级 · 航天级纯度</p>
+    <div class="stat-row"><span class="stat-label">输出压力</span><span class="stat-val">150 MPa</span></div>
+    <div class="stat-row"><span class="stat-label">生成速度</span><span class="stat-val">快</span></div>
+    <div class="stat-row"><span class="stat-label">耗电</span><span class="stat-val">中高</span></div>
+    <div class="stat-row"><span class="stat-label">气体纯度</span><span class="stat-val">极高（航天推进剂 / 最高温燃料）</span></div>
+    <div class="stat-row"><span class="stat-label">MEA 寿命</span><span class="stat-val" style="color:var(--accent3)">长寿命</span></div>
+    <h4 style="margin-top:12px">消耗品</h4>
+    <div class="stat-row"><span class="stat-label">🔬 膜电极 MEA</span><span class="stat-val"><span class="tag tag-buy">仅购买</span> 不可生产</span></div>
+    <div class="stat-row"><span class="stat-label">💎 铂金催化剂</span><span class="stat-val"><span class="tag tag-buy">仅购买</span> 贵！</span></div>
+  </div>
+</div>
+
+<!-- ==================== GAS BOTTLES ==================== -->
+<h2 id="bottles">🫙 储气瓶 — 4 级升级树</h2>
+<p>储气瓶决定<strong>可携带气体量</strong>和<strong>外出活动半径</strong>。材料来源与冶炼技术挂钩。</p>
+
+<div class="card-grid col4">
+  <div class="card">
+    <h3><span class="tier tier-t1">T1</span> 钢气罐</h3>
+    <div class="stat-row"><span class="stat-label">材料</span><span class="stat-val">钢（月壤炼铁）</span></div>
+    <div class="stat-row"><span class="stat-label">重量</span><span class="stat-val">大</span></div>
+    <div class="stat-row"><span class="stat-label">储气量</span><span class="stat-val">中</span></div>
+    <div class="stat-row"><span class="stat-label">制作</span><span class="stat-val"><span class="tag tag-make">可自制</span> <span class="tag tag-buy">可购买</span></span></div>
+    <div class="bar-track"><div class="bar-fill bar-lo" style="width:35%"></div></div>
+  </div>
+  <div class="card">
+    <h3><span class="tier tier-t2">T2</span> 钢胆碳纤瓶</h3>
+    <div class="stat-row"><span class="stat-label">材料</span><span class="stat-val">钢 + 碳纤维</span></div>
+    <div class="stat-row"><span class="stat-label">重量</span><span class="stat-val">中</span></div>
+    <div class="stat-row"><span class="stat-label">储气量</span><span class="stat-val">中</span></div>
+    <div class="stat-row"><span class="stat-label">制作</span><span class="stat-val"><span class="tag tag-make">可自制</span> <span class="tag tag-buy">可购买</span></span></div>
+    <div class="bar-track"><div class="bar-fill bar-md" style="width:50%"></div></div>
+  </div>
+  <div class="card">
+    <h3><span class="tier tier-t3">T3</span> 铝胆碳纤瓶</h3>
+    <div class="stat-row"><span class="stat-label">材料</span><span class="stat-val">铝 + 碳纤维</span></div>
+    <div class="stat-row"><span class="stat-label">重量</span><span class="stat-val">轻</span></div>
+    <div class="stat-row"><span class="stat-label">储气量</span><span class="stat-val">高</span></div>
+    <div class="stat-row"><span class="stat-label">制作</span><span class="stat-val"><span class="tag tag-make">可自制</span> <span class="tag tag-buy">可购买</span></span></div>
+    <div class="bar-track"><div class="bar-fill bar-hi" style="width:75%"></div></div>
+  </div>
+  <div class="card">
+    <h3><span class="tier tier-t4">T4</span> 全碳瓶</h3>
+    <div class="stat-row"><span class="stat-label">材料</span><span class="stat-val">纯碳</span></div>
+    <div class="stat-row"><span class="stat-label">重量</span><span class="stat-val">最轻</span></div>
+    <div class="stat-row"><span class="stat-label">储气量</span><span class="stat-val">最高</span></div>
+    <div class="stat-row"><span class="stat-label">制作</span><span class="stat-val"><span class="tag tag-make">可自制</span> <span class="tag tag-rare">碳稀有！</span></span></div>
+    <div class="bar-track"><div class="bar-fill bar-max" style="width:100%"></div></div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>碳元素获取途径（卡科技树的关键稀有资源）：</strong><br>
+  ① 每个陨石坑含一个<strong>碳矿</strong>，刷新时间控制总量<br>
+  ② 提炼月壤微量副产碳（慢）<br>
+  ③ 后期<strong>人工光合作用</strong>产碳（科技解锁）<br>
+  <strong>铝元素：</strong>月壤含铝，但<strong>提炼耗能极大</strong>——用能源卡住 T3 进度。<br>
+  <strong>铁/钢：</strong>月壤炼铁相对容易，T1/T2 可较快达到。
+</div>
+
+<!-- ==================== BATTERIES ==================== -->
+<h2 id="batteries">🔋 电池系统 — 5 级升级树</h2>
+<p>电池决定<strong>夜间续航能力</strong>。储电量和放电效率是两个独立维度——储电多但放得慢也会卡脖子。</p>
+
+<div class="card-grid col2">
+  <div class="card">
+    <h3><span class="tier tier-t1">T1</span> 镍氢电池 Ni-MH</h3>
+    <p style="color:var(--text-dim)">初始电池 · 皮实耐用</p>
+    <div class="stat-row"><span class="stat-label">原料</span><span class="stat-val">镍 + 氢 <span class="tag tag-make">可自制</span></span></div>
+    <div class="stat-row"><span class="stat-label">储电量</span><span class="stat-val">少</span></div>
+    <div class="stat-row"><span class="stat-label">放电效率</span><span class="stat-val" style="color:var(--danger)">低</span></div>
+    <div class="stat-row"><span class="stat-label">特点</span><span class="stat-val">买得起、造得出、但放电慢会卡住</span></div>
+    <div class="bar-track"><div class="bar-fill bar-lo" style="width:25%"></div></div>
+  </div>
+
+  <div class="card">
+    <h3><span class="tier tier-t2">T2</span> 铝离子电池 Al-ion</h3>
+    <p style="color:var(--text-dim)">储电中 · 放电中</p>
+    <div class="stat-row"><span class="stat-label">原料</span><span class="stat-val">铝 + 钛 <span class="tag tag-make">可自制</span></span></div>
+    <div class="stat-row"><span class="stat-label">储电量</span><span class="stat-val">中</span></div>
+    <div class="stat-row"><span class="stat-label">放电效率</span><span class="stat-val" style="color:var(--warn)">中</span></div>
+    <div class="stat-row"><span class="stat-label">瓶颈</span><span class="stat-val">铝冶炼耗电大</span></div>
+    <div class="bar-track"><div class="bar-fill bar-md" style="width:45%"></div></div>
+  </div>
+
+  <div class="card">
+    <h3><span class="tier tier-t3">T3</span> 钠离子电池 Na-ion</h3>
+    <p style="color:var(--text-dim)">储电中 · 放电中上</p>
+    <div class="stat-row"><span class="stat-label">原料</span><span class="stat-val">长石（月表常见）<span class="tag tag-make">可自制</span></span></div>
+    <div class="stat-row"><span class="stat-label">储电量</span><span class="stat-val">中</span></div>
+    <div class="stat-row"><span class="stat-label">放电效率</span><span class="stat-val" style="color:var(--accent3)">中上</span></div>
+    <div class="stat-row"><span class="stat-label">优势</span><span class="stat-val">原料易得，月球长石丰富</span></div>
+    <div class="bar-track"><div class="bar-fill bar-hi" style="width:60%"></div></div>
+  </div>
+
+  <div class="card">
+    <h3><span class="tier tier-t4">T4</span> 燃料电池 PFC</h3>
+    <p style="color:var(--text-dim)">储电中 · 放电高</p>
+    <div class="stat-row"><span class="stat-label">原料</span><span class="stat-val">氢气 + 氧气 <span class="tag tag-make">可自制</span></span></div>
+    <div class="stat-row"><span class="stat-label">储电量</span><span class="stat-val">中</span></div>
+    <div class="stat-row"><span class="stat-label">放电效率</span><span class="stat-val" style="color:var(--accent)">高</span></div>
+    <div class="stat-row"><span class="stat-label">本质</span><span class="stat-val">即燃烧发电模块的"电池形态"</span></div>
+    <div class="bar-track"><div class="bar-fill bar-vhi" style="width:75%"></div></div>
+  </div>
+
+  <div class="card">
+    <h3><span class="tier tier-t5">T5</span> 再生燃料电池 RFC</h3>
+    <p style="color:var(--text-dim)">储电高 · 放电高 · 终局装备</p>
+    <div class="stat-row"><span class="stat-label">原料</span><span class="stat-val">氢气 + 氧气 <span class="tag tag-make">可自制</span></span></div>
+    <div class="stat-row"><span class="stat-label">储电量</span><span class="stat-val">高</span></div>
+    <div class="stat-row"><span class="stat-label">放电效率</span><span class="stat-val" style="color:var(--accent3)">高</span></div>
+    <div class="stat-row"><span class="stat-label">瓶颈</span><span class="stat-val"><span class="tag tag-rare">再生部件仅末期可造</span></span></div>
+    <div class="bar-track"><div class="bar-fill bar-max" style="width:100%"></div></div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>设计意图：</strong>电池升级树的"卡点"各不相同——<br>
+  Ni-MH → Al-ion：卡铝冶炼能耗<br>
+  Al-ion → Na-ion：卡长石提纯技术<br>
+  Na-ion → PFC：卡气体压缩+储存产业链成熟度<br>
+  PFC → RFC：卡再生部件材料（末期内容）<br>
+  每级电池 <span class="tag tag-buy">都可购买</span>，但自制更划算。初期金属类电池无法大规模制造，靠购买过渡。
+</div>
+
+<!-- ==================== ENERGY ==================== -->
+<h2 id="energy">⚡ 能源系统</h2>
+
+<h3>昼夜循环</h3>
+<div class="cycle-row">
+  <div class="cycle-seg cycle-day">
+    <h4 style="color:#ffcc66">☀️ 白天（约 120s）</h4>
+    <p style="font-size:0.9em">太阳能板工作<br>盈余 → 充电池 → 再盈余 → 加热月壤制水</p>
+    <p style="color:var(--accent3);font-weight:700;font-size:1.2em">电力充裕</p>
+    <p style="font-size:0.8em;color:var(--text-dim)">保温耗电：低</p>
+  </div>
+  <div class="cycle-seg cycle-night">
+    <h4 style="color:#6666cc">🌙 夜晚（约 120s）</h4>
+    <p style="font-size:0.9em">太阳能板停工<br>保温耗电增加 → 依赖蓄电池<br>燃烧 H₂+O₂ 发电补缺口</p>
+    <p style="color:var(--danger);font-weight:700;font-size:1.2em">电力紧张</p>
+    <p style="font-size:0.8em;color:var(--text-dim)">保温耗电：高</p>
+  </div>
+</div>
+
+<h3>发电模块</h3>
+<div class="card-grid">
+  <div class="card">
+    <h3>☀️ 太阳能模块</h3>
+    <p>白天主力发电。可<strong>增加光伏板数量</strong>提升发电效率。</p>
+    <div class="stat-row"><span class="stat-label">产出</span><span class="stat-val">白天发电 · 夜晚 = 0</span></div>
+    <div class="stat-row"><span class="stat-label">升级</span><span class="stat-val">增加光伏板 → 提升峰值功率</span></div>
+    <div class="stat-row"><span class="stat-label">存储</span><span class="stat-val">盈余 → 蓄电池（数量决定容量）</span></div>
+    <div class="stat-row"><span class="stat-label">再盈余</span><span class="stat-val">→ 加热月壤 → 制水 → 电解 → 气瓶</span></div>
+  </div>
+  <div class="card">
+    <h3>🔥 燃烧发电模块</h3>
+    <p>夜间主力发电。燃烧<strong>氢气瓶 + 氧气瓶</strong>。</p>
+    <div class="stat-row"><span class="stat-label">本质</span><span class="stat-val">白天冗余能量的"缓存"</span></div>
+    <div class="stat-row"><span class="stat-label">流程</span><span class="stat-val">白天盈余电 → 制水 → 电解 → 压缩机 → 气瓶</span></div>
+    <div class="stat-row"><span class="stat-label">夜晚</span><span class="stat-val">燃烧 H₂+O₂ 气瓶 → 发电</span></div>
+    <div class="stat-row"><span class="stat-label">依赖</span><span class="stat-val">需气体压缩机 + 储气瓶 + 燃料电池</span></div>
+  </div>
+  <div class="card">
+    <h3>🔋 蓄电池组</h3>
+    <p>独立房间系统（基地的一个页面）。蓄电池数量决定储电上限。</p>
+    <div class="stat-row"><span class="stat-label">前期</span><span class="stat-val">少量 Ni-MH，勉强撑过夜晚</span></div>
+    <div class="stat-row"><span class="stat-label">中期</span><span class="stat-val">铝离子/钠离子，舒适过夜</span></div>
+    <div class="stat-row"><span class="stat-label">后期</span><span class="stat-val">RFC 阵列，夜晚产能 > 白天</span></div>
+  </div>
+</div>
+
+<h3>全日能量流动图</h3>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;margin:16px 0;font-size:0.88em;overflow-x:auto">
+
+<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;min-width:700px">
+  <!-- SUN -->
+  <div class="flow-box energy" style="min-width:80px">
+    <strong>☀️ 太阳</strong>
+    <span class="flow-label">白天常量</span>
+  </div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box process" style="min-width:100px">
+    <strong>光伏板阵列</strong>
+    <span class="flow-label">N× 光伏板<br>决定峰值功率</span>
+  </div>
+  <div class="flow-arrow">→</div>
+  <div style="background:var(--surface2);border:2px solid #5a5a20;border-radius:10px;padding:10px 16px">
+    <strong style="color:#ffcc44">电力总线</strong>
+    <span class="flow-label">分配枢纽</span>
+  </div>
+
+  <!-- branching -->
+  <div style="display:flex;flex-direction:column;gap:6px;margin-left:4px">
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="color:var(--accent3);font-size:0.85em">①优先</span>
+      <div class="flow-box" style="border-color:#4a4;font-size:0.85em;padding:6px 12px">🏠 基地日常<br><small>生命维持+设备待机</small></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="color:var(--accent);font-size:0.85em">②盈余</span>
+      <div class="flow-box" style="border-color:#44a;font-size:0.85em;padding:6px 12px">🔋 充电电池<br><small>蓄电池组储存</small></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="color:var(--accent2);font-size:0.85em">③再盈余</span>
+      <div class="flow-box" style="border-color:#a84;font-size:0.85em;padding:6px 12px">🔥 加热月壤<br><small>制水+电解+压缩→气瓶</small></div>
+    </div>
+  </div>
+
+  <!-- arrow to night -->
+  <div style="width:100%;text-align:center;color:var(--text-dim);margin:8px 0">⬇ 夜晚来临 ⬇</div>
+
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="flow-box" style="border-color:#44a;font-size:0.85em">🔋 蓄电池<br><small>放电</small></div>
+    <span style="color:var(--text-dim)">+</span>
+    <div class="flow-box" style="border-color:#a44;font-size:0.85em">🔥 燃烧发电<br><small>H₂+O₂→电</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box" style="border-color:#4a4;font-size:0.85em;padding:6px 12px">🏠 基地<br><small>日常 + 保温(耗电↑)</small></div>
+  </div>
+</div>
+
+</div>
+
+<!-- ==================== SIGNAL STATION ==================== -->
+<h2 id="signal">📡 信号基站 — 4 级升级树</h2>
+<p>信号基站是<strong>联系地球的命脉</strong>。没有信号 = 无法网购 = 无法购买关键消耗品。<br>
+信号越好 → 订单越快到达、价格越优惠、解锁远程操作能力。</p>
+
+<div class="card-grid col2">
+  <!-- T0: No station -->
+  <div class="card" style="border-style:dashed;opacity:0.8">
+    <h3><span class="tier" style="background:#222;color:#666">T0</span> 无基站 · 初始状态</h3>
+    <div class="stat-row"><span class="stat-label">通讯方式</span><span class="stat-val">飞行仓自带应急天线（功率极低）</span></div>
+    <div class="stat-row"><span class="stat-label">网购</span><span class="stat-val">❌ 不可用</span></div>
+    <div class="stat-row"><span class="stat-label">订单</span><span class="stat-val">❌ 不可用</span></div>
+    <div class="stat-row"><span class="stat-label">远程采矿</span><span class="stat-val">❌ 不可用</span></div>
+    <div class="stat-row"><span class="stat-label">现状</span><span class="stat-val">只能靠自给自足，网购兜底不可用</span></div>
+  </div>
+
+  <!-- T1 -->
+  <div class="card">
+    <h3><span class="tier tier-t1">T1</span> 折叠天线阵</h3>
+    <p style="color:var(--text-dim)">展开式抛物面天线 · 初期可负担</p>
+    <div class="stat-row"><span class="stat-label">覆盖范围</span><span class="stat-val">近月面（~100km 半径）</span></div>
+    <div class="stat-row"><span class="stat-label">网购解锁</span><span class="stat-val">✅ 基础商城可用</span></div>
+    <div class="stat-row"><span class="stat-label">订单速度</span><span class="stat-val">慢（2~3 个昼夜到达）</span></div>
+    <div class="stat-row"><span class="stat-label">价格系数</span><span class="stat-val">×1.5（偏远地区附加费）</span></div>
+    <div class="stat-row"><span class="stat-label">耗电</span><span class="stat-val">低（~50W）</span></div>
+    <div class="stat-row"><span class="stat-label">特殊功能</span><span class="stat-val">—</span></div>
+    <div class="stat-row"><span class="stat-label">原料</span><span class="stat-val">铝 + 铜线 <span class="tag tag-make">可自制</span> <span class="tag tag-buy">可购买</span></span></div>
+  </div>
+
+  <!-- T2 -->
+  <div class="card">
+    <h3><span class="tier tier-t2">T2</span> 相控阵基站</h3>
+    <p style="color:var(--text-dim)">电子扫描阵列 · 无需机械转动</p>
+    <div class="stat-row"><span class="stat-label">覆盖范围</span><span class="stat-val">中等距离（~500km）</span></div>
+    <div class="stat-row"><span class="stat-label">网购解锁</span><span class="stat-val">✅ 中级商城解锁</span></div>
+    <div class="stat-row"><span class="stat-label">订单速度</span><span class="stat-val">中（1~2 昼夜到达）</span></div>
+    <div class="stat-row"><span class="stat-label">价格系数</span><span class="stat-val">×1.2</span></div>
+    <div class="stat-row"><span class="stat-label">耗电</span><span class="stat-val">中（~200W）</span></div>
+    <div class="stat-row"><span class="stat-label">特殊功能</span><span class="stat-val">📡 可扫描附近陨石坑资源分布</span></div>
+    <div class="stat-row"><span class="stat-label">原料</span><span class="stat-val">硅晶片 + 稀土磁体 <span class="tag tag-make">部分自制</span></span></div>
+  </div>
+
+  <!-- T3 -->
+  <div class="card">
+    <h3><span class="tier tier-t3">T3</span> 深空通讯阵列</h3>
+    <p style="color:var(--text-dim)">大型碟形天线 · 直接联系地球</p>
+    <div class="stat-row"><span class="stat-label">覆盖范围</span><span class="stat-val">全月面 + 近月轨道</span></div>
+    <div class="stat-row"><span class="stat-label">网购解锁</span><span class="stat-val">✅ 高级商城解锁（含稀有物品）</span></div>
+    <div class="stat-row"><span class="stat-label">订单速度</span><span class="stat-val">快（0.5~1 昼夜到达）</span></div>
+    <div class="stat-row"><span class="stat-label">价格系数</span><span class="stat-val">×1.0（标准价）</span></div>
+    <div class="stat-row"><span class="stat-label">耗电</span><span class="stat-val">高（~1kW）</span></div>
+    <div class="stat-row"><span class="stat-label">特殊功能</span><span class="stat-val">🤖 远程采矿控制 · 📊 资源储量探测</span></div>
+    <div class="stat-row"><span class="stat-label">原料</span><span class="stat-val">高精度伺服 + 碳纤维结构 <span class="tag tag-rare">稀有材料</span></span></div>
+  </div>
+
+  <!-- T4 -->
+  <div class="card">
+    <h3><span class="tier tier-t4">T4</span> 量子中继站</h3>
+    <p style="color:var(--text-dim)">终局通讯 · 量子纠缠超距传输</p>
+    <div class="stat-row"><span class="stat-label">覆盖范围</span><span class="stat-val">全太阳系</span></div>
+    <div class="stat-row"><span class="stat-label">网购解锁</span><span class="stat-val">✅ 终极商城（所有物品）</span></div>
+    <div class="stat-row"><span class="stat-label">订单速度</span><span class="stat-val">即时到达</span></div>
+    <div class="stat-row"><span class="stat-label">价格系数</span><span class="stat-val">×0.8（VIP 折扣）</span></div>
+    <div class="stat-row"><span class="stat-label">耗电</span><span class="stat-val">极高（~5kW）</span></div>
+    <div class="stat-row"><span class="stat-label">特殊功能</span><span class="stat-val">🛸 叫飞船（终局）· 🌍 地球市场实时行情</span></div>
+    <div class="stat-row"><span class="stat-label">原料</span><span class="stat-val">量子晶体 + 超导线圈 <span class="tag tag-rare">仅可购买</span></span></div>
+  </div>
+</div>
+
+<div class="note idea">
+  <strong>信号基站的游戏意义：</strong><br>
+  • T0→T1 是<strong>第一个重大解锁</strong>——开通网购，获得兜底保障<br>
+  • T1→T2 解锁<strong>资源扫描</strong>，玩家不再盲目找矿<br>
+  • T2→T3 解锁<strong>远程采矿</strong>（放置玩法核心：离线后矿机继续工作）<br>
+  • T3→T4 是<strong>终局钥匙</strong>——叫飞船离开月球的条件之一<br>
+  • 信号站<strong>必须持续供电</strong>，断电 = 失去信号 = 失去网购和远程控制
+</div>
+
+<!-- ==================== BASE ROOMS ==================== -->
+<h2 id="base">🏠 基地房间系统</h2>
+<p>基地是<strong>多个"页面"组成的合集</strong>，每个页面 = 一个功能房间。类似银河奶牛的"牧场页面"概念。</p>
+
+<div class="card-grid col4">
+  <div class="card">
+    <h3>🔧 高温作业室</h3>
+    <ul style="font-size:0.88em;padding-left:18px">
+      <li>熔融萃取炉（月壤→O₂）</li>
+      <li>熔盐解离仪（固态电解）</li>
+      <li>精炼炉（废料→钛合金）</li>
+      <li>冶炼炉（铁/铝/铬）</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🌡 常温作业室</h3>
+    <ul style="font-size:0.88em;padding-left:18px">
+      <li>电解器-冰（月冰→H₂+O₂）</li>
+      <li>气体压缩机（气瓶生产）</li>
+      <li>人工光合反应器</li>
+      <li>尿液净化系统</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🏗 建造室</h3>
+    <ul style="font-size:0.88em;padding-left:18px">
+      <li>3D 打印机（零件自制）</li>
+      <li>精炼炉（材料加工）</li>
+      <li>工作台（设备组装）</li>
+      <li>储气瓶充装站</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🌱 培养室</h3>
+    <ul style="font-size:0.88em;padding-left:18px">
+      <li>小圆藻培养皿（O₂+食物）</li>
+      <li>生菜种植槽</li>
+      <li>土豆种植槽</li>
+      <li>CO₂ 循环系统</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🔋 电力室</h3>
+    <ul style="font-size:0.88em;padding-left:18px">
+      <li>蓄电池组（储电容量）</li>
+      <li>太阳能控制器</li>
+      <li>燃烧发电机组</li>
+      <li>配电柜（功率分配）</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>📡 通讯室</h3>
+    <ul style="font-size:0.88em;padding-left:18px">
+      <li>信号基站主机</li>
+      <li>网购终端</li>
+      <li>远程采矿控制台</li>
+      <li>地球市场行情屏</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🛒 仓库</h3>
+    <ul style="font-size:0.88em;padding-left:18px">
+      <li>月壤堆场</li>
+      <li>月冰储槽</li>
+      <li>气瓶架（O₂/H₂/CH₄）</li>
+      <li>零件库</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🚀 飞行仓</h3>
+    <ul style="font-size:0.88em;padding-left:18px">
+      <li>生命维持总控</li>
+      <li>O₂ 监测面板</li>
+      <li>出仓/EVA 准备</li>
+      <li>应急氧气罐</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==================== TECH TREE ==================== -->
+<h2 id="progression">📈 科技树 / 游戏阶段总览</h2>
+
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;margin:16px 0;overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;font-size:0.88em;min-width:900px">
+<thead>
+<tr style="border-bottom:2px solid var(--border)">
+  <th style="padding:10px;text-align:left;color:var(--text-dim)">阶段</th>
+  <th style="padding:10px;text-align:left">名称</th>
+  <th style="padding:10px;text-align:left">关键解锁</th>
+  <th style="padding:10px;text-align:left">主要瓶颈</th>
+  <th style="padding:10px;text-align:left">能量状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td style="padding:8px 10px"><span class="tier tier-t1">P1</span></td>
+  <td style="padding:8px 10px"><strong>着陆求生</strong></td>
+  <td style="padding:8px 10px;font-size:0.85em">
+    · 采集月壤/月冰<br>
+    · 加热月壤→水<br>
+    · 电解水→O₂<br>
+    · 网购应急氧气罐
+  </td>
+  <td style="padding:8px 10px;font-size:0.85em">手动操作一切<br>无自动化</td>
+  <td style="padding:8px 10px;font-size:0.85em">白天够用<br>夜晚紧张<br><small>（初始 2 夜能量储备）</small></td>
+</tr>
+<tr>
+  <td style="padding:8px 10px"><span class="tier tier-t2">P2</span></td>
+  <td style="padding:8px 10px"><strong>基础工业化</strong></td>
+  <td style="padding:8px 10px;font-size:0.85em">
+    · T1 活塞压缩机 + 钢气罐<br>
+    · T1 折叠天线阵（网购开通）<br>
+    · T1 Ni-MH 电池<br>
+    · 熔融萃取炉
+  </td>
+  <td style="padding:8px 10px;font-size:0.85em">气阀组损耗<br>润滑油消耗<br>电池放电慢</td>
+  <td style="padding:8px 10px;font-size:0.85em">白天盈余→制气瓶<br>夜晚气瓶+电池撑过</td>
+</tr>
+<tr>
+  <td style="padding:8px 10px"><span class="tier tier-t2">P3</span></td>
+  <td style="padding:8px 10px"><strong>稳定发展</strong></td>
+  <td style="padding:8px 10px;font-size:0.85em">
+    · T2 离子压缩机 + 钢胆碳纤瓶<br>
+    · T2 相控阵基站（资源扫描）<br>
+    · Al-ion / Na-ion 电池<br>
+    · 月冰水解路线
+  </td>
+  <td style="padding:8px 10px;font-size:0.85em">铝冶炼能耗<br>长石提纯技术</td>
+  <td style="padding:8px 10px;font-size:0.85em">电池容量提升<br>夜晚不再紧张</td>
+</tr>
+<tr>
+  <td style="padding:8px 10px"><span class="tier tier-t3">P4</span></td>
+  <td style="padding:8px 10px"><strong>扩张时代</strong></td>
+  <td style="padding:8px 10px;font-size:0.85em">
+    · T3 电化学压缩机 + 铝胆碳纤瓶<br>
+    · T3 深空阵列（远程采矿）<br>
+    · PFC 燃料电池<br>
+    · 人工光合作用 · 3D打印
+  </td>
+  <td style="padding:8px 10px;font-size:0.85em">MEA+铂金催化剂<br>碳元素储量<br>气体产业链成熟度</td>
+  <td style="padding:8px 10px;font-size:0.85em">气瓶储备充足<br>完全自动化运行</td>
+</tr>
+<tr>
+  <td style="padding:8px 10px"><span class="tier tier-t4">P5</span></td>
+  <td style="padding:8px 10px"><strong>终局 · 离开月球</strong></td>
+  <td style="padding:8px 10px;font-size:0.85em">
+    · T4 全碳瓶<br>
+    · T4 量子中继站（叫飞船）<br>
+    · RFC 再生燃料电池<br>
+    · 固态电解 · 钛合金→飞船
+  </td>
+  <td style="padding:8px 10px;font-size:0.85em">碳元素大量需求<br>量子晶体（仅购买）<br>再生部件（末期制造）</td>
+  <td style="padding:8px 10px;font-size:0.85em">RFC 阵列<br>夜晚产能 > 白天</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<!-- ==================== NUMBERS ==================== -->
+<h2 id="numbers">📊 关键数值平衡参考</h2>
+
+<div class="card-grid col2">
+  <div class="card">
+    <h3>时间系统</h3>
+    <div class="stat-row"><span class="stat-label">1 月球昼夜</span><span class="stat-val">≈ 游戏 240s（现实 4min）</span></div>
+    <div class="stat-row"><span class="stat-label">白天 / 夜晚</span><span class="stat-val">各约 120s</span></div>
+    <div class="stat-row"><span class="stat-label">14 游戏天</span><span class="stat-val">≈ 现实 1 天（约 1h）</span></div>
+    <div class="stat-row"><span class="stat-label">1 游戏天</span><span class="stat-val">≈ 4.3 分钟现实时间</span></div>
+  </div>
+  <div class="card">
+    <h3>能源平衡（设计目标）</h3>
+    <div class="stat-row"><span class="stat-label">白天太阳能</span><span class="stat-val">日常消耗 × 1.5~3（视光伏板数量）</span></div>
+    <div class="stat-row"><span class="stat-label">盈余分配</span><span class="stat-val">电池充满 → 剩余→加热月壤制气瓶</span></div>
+    <div class="stat-row"><span class="stat-label">夜晚消耗</span><span class="stat-val">日常 × 1.3（保温）+ 设备待机</span></div>
+    <div class="stat-row"><span class="stat-label">夜间来源</span><span class="stat-val">电池放电 + 燃烧发电</span></div>
+    <div class="stat-row"><span class="stat-label">初期馈赠</span><span class="stat-val">够 2 次夜晚的能量储备</span></div>
+  </div>
+  <div class="card">
+    <h3>氧气系统</h3>
+    <div class="stat-row"><span class="stat-label">基础消耗</span><span class="stat-val">1.5% / min（被动词条）</span></div>
+    <div class="stat-row"><span class="stat-label">O₂ > 20%</span><span class="stat-val">正常 · HUD 蓝色</span></div>
+    <div class="stat-row"><span class="stat-label">O₂ 10~20%</span><span class="stat-val">低氧警告 · HUD 黄色</span></div>
+    <div class="stat-row"><span class="stat-label">O₂ < 10%</span><span class="stat-val">严重不足 · HUD 红色</span></div>
+    <div class="stat-row"><span class="stat-label">O₂ = 0%</span><span class="stat-val">速度 ×50% · 禁止采矿 · 植物枯萎</span></div>
+    <div class="stat-row"><span class="stat-label">应急恢复</span><span class="stat-val">紧急电解兜底 +0.15/min（很慢）</span></div>
+  </div>
+  <div class="card">
+    <h3>资源采集</h3>
+    <div class="stat-row"><span class="stat-label">月壤</span><span class="stat-val">月表普遍分布，采集容易</span></div>
+    <div class="stat-row"><span class="stat-label">月冰</span><span class="stat-val">极地区域丰富，赤道稀少</span></div>
+    <div class="stat-row"><span class="stat-label">碳矿</span><span class="stat-val">每个陨石坑 1 个，定时刷新</span></div>
+    <div class="stat-row"><span class="stat-label">铁</span><span class="stat-val">月壤提炼，相对容易</span></div>
+    <div class="stat-row"><span class="stat-label">铝</span><span class="stat-val">月壤提炼，耗电极大</span></div>
+    <div class="stat-row"><span class="stat-label">铬矿</span><span class="stat-val">稀有矿产，特定区域</span></div>
+    <div class="stat-row"><span class="stat-label">长石</span><span class="stat-val">月表普遍，钠离子电池原料</span></div>
+  </div>
+</div>
+
+<!-- ==================== ALL EQUIPMENT SUMMARY ==================== -->
+<h2 id="equipment-all">📋 全装备总览表</h2>
+
+<div style="overflow-x:auto">
+<table class="stat-table">
+<thead>
+<tr>
+  <th>类别</th>
+  <th>等级</th>
+  <th>名称</th>
+  <th>关键属性</th>
+  <th>消耗品</th>
+  <th>获取</th>
+  <th>瓶颈</th>
+</tr>
+</thead>
+<tbody>
+<tr><td rowspan="3">🔧 压缩机</td><td>T1</td><td>活塞式</td><td>30MPa · 慢 · 纯度中</td><td>气阀组 · 润滑油</td><td>买+3D打</td><td>气阀组 2%/瓶</td></tr>
+<tr><td>T2</td><td>离子式</td><td>70MPa · 中 · 纯度高</td><td>金属阀组 · 液压油</td><td>买+冶炼</td><td>矿+1500℃</td></tr>
+<tr><td>T3</td><td>电化学</td><td>150MPa · 快 · 纯度极高</td><td>MEA · 铂金催化剂</td><td>仅购买</td><td>催化剂贵</td></tr>
+<tr><th colspan="7" style="background:var(--surface2);height:8px"></th></tr>
+<tr><td rowspan="4">🫙 储气瓶</td><td>T1</td><td>钢气罐</td><td>重 · 储气中</td><td>—</td><td>买+自制</td><td>钢=铁月壤炼</td></tr>
+<tr><td>T2</td><td>钢胆碳纤</td><td>中 · 储气中</td><td>—</td><td>买+自制</td><td>碳纤维技术</td></tr>
+<tr><td>T3</td><td>铝胆碳纤</td><td>轻 · 储气高</td><td>—</td><td>买+自制</td><td>铝冶炼耗电大</td></tr>
+<tr><td>T4</td><td>全碳瓶</td><td>最轻 · 储气最高</td><td>—</td><td>自制</td><td>碳元素稀有</td></tr>
+<tr><th colspan="7" style="background:var(--surface2);height:8px"></th></tr>
+<tr><td rowspan="5">🔋 电池</td><td>T1</td><td>Ni-MH</td><td>储电少 · 放电低</td><td>—</td><td>买+自制</td><td>皮实但慢</td></tr>
+<tr><td>T2</td><td>Al-ion</td><td>储电中 · 放电中</td><td>—</td><td>买+自制</td><td>铝冶炼</td></tr>
+<tr><td>T3</td><td>Na-ion</td><td>储电中 · 放电中上</td><td>—</td><td>自制</td><td>长石提纯</td></tr>
+<tr><td>T4</td><td>PFC</td><td>储电中 · 放电高</td><td>H₂+O₂</td><td>自制</td><td>气瓶产业链</td></tr>
+<tr><td>T5</td><td>RFC</td><td>储电高 · 放电高</td><td>H₂+O₂</td><td>仅末期</td><td>再生部件</td></tr>
+<tr><th colspan="7" style="background:var(--surface2);height:8px"></th></tr>
+<tr><td rowspan="4">📡 信号站</td><td>T1</td><td>折叠天线阵</td><td>~100km · 网购×1.5</td><td>—</td><td>买+自制</td><td>铝+铜</td></tr>
+<tr><td>T2</td><td>相控阵基站</td><td>~500km · 网购×1.2</td><td>—</td><td>部分自制</td><td>硅晶片+稀土</td></tr>
+<tr><td>T3</td><td>深空阵列</td><td>全月面 · 网购×1.0</td><td>—</td><td>买+自制</td><td>碳纤维结构</td></tr>
+<tr><td>T4</td><td>量子中继站</td><td>全太阳系 · 网购×0.8</td><td>—</td><td>仅购买</td><td>量子晶体</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ==================== FOOTER ==================== -->
+<div style="text-align:center;padding:40px 0 20px;color:var(--text-dim);font-size:0.85em">
+  <p>Lunar Survival · 月球穷游者 — 游戏设计文档 v1.0</p>
+  <p>最后更新：2026-06-08 · 设计日志：<code>D:\.claude workspace\design-journal.md</code></p>
+  <p style="margin-top:8px">🛠 下一待实现：生命维持系统完整编码（气体压缩机 + 氧气瓶 + 月壤加热链）</p>
+</div>
+
+</body>
+</html>
