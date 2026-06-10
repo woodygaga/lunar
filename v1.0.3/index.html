@@ -2821,11 +2821,8 @@ function retrieveBeacon(id){
   _soilToastUntil = performance.now()+1500; _soilToastText = '📡 信号基站已回收';
   showResourceNotice('📡 信号基站已回收');
 }
-// 阶段4：内联后同窗口，直接从 SaveSys 读已发现月壤点（原 reqSoil/soilTotal 往返删除）
-if (window.SaveSys) {
-  const _disc = SaveSys.get('discoveredRocks') || {};
-  Object.keys(_disc).forEach(id => _discoveredIds.add(id));
-}
+// 阶段4：已发现月壤点在下方 const _discoveredIds 处直接从 SaveSys 初始化（此处原冗余块已删，
+// 它在 _discoveredIds 定义前调用 .add 触发 TDZ 报错 → 整个模块崩 → live黑+信号不显示）
 // 阶段4：自动采集切换暴露为全局函数，供 base 直接调用（原 setAutoCollect postMessage）
 window.__setAutoCollect__ = function(on, rocks){
   autoCollect = on;
